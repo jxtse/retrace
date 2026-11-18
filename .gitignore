@@ -1,0 +1,32 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.venv*/
+venv/
+venv*/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+
+# Run artefacts and caches (never committed; produced by the drivers and tests)
+.cache/
+runs/
+snapshots/
+checkpoints/
+checkpoint-*/
+adapter_model.safetensors
+*.log
+
+# Scratch output of the stage-3 runtime unit tests
+posttraining/stage3_self_refinement/runtime/evidence/unit-*/
+posttraining/stage3_self_refinement/runtime/evidence/fix/NO_CLAIM-fix-*/

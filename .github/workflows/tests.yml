@@ -1,0 +1,64 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  harness:
+    name: harness tests (${{ matrix.dir }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir:
+          - agent
+          - agent-chemoenzymatic
+          - posttraining/eval_harness
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+          enable-cache: true
+      - run: uv sync
+      - run: uv run pytest -q
+
+  posttraining:
+    name: posttraining offline tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+          enable-cache: true
+      - name: Create environment and install pytest
+        run: |
+          uv venv --allow-existing .venv
+          uv pip install --python .venv/bin/python pytest
+      - name: Byte-compile and syntax-check
+        working-directory: posttraining
+        run: |
+          ../.venv/bin/python -m compileall -q stage1_critique stage2_teacher_trajectories \
+            stage3_self_refinement teacher_sft online_opsd online_grpo \
+            chemistry_audit metrics configs
+          for f in $(find . -name '*.sh'); do bash -n "$f"; done
+      - name: Stage-1 SDFT adapters
+        working-directory: posttraining
+        run: PYTHONPATH=stage1_critique/sdft ../.venv/bin/python -m pytest -q stage1_critique/sdft/tests
+      - name: Stage-2 replicate queue
+        working-directory: posttraining
+        run: PYTHONPATH=stage2_teacher_trajectories/collection ../.venv/bin/python -m pytest -q stage2_teacher_trajectories/collection/test_append_rep3.py
+      - name: Stage-3 screen
+        working-directory: posttraining
+        run: ../.venv/bin/python -m pytest -q stage3_self_refinement/screen/test_validate_screen.py
+      - name: Stage-3 runtime contract
+        working-directory: posttraining
+        run: PYTHONPATH=stage3_self_refinement/runtime/src ../.venv/bin/python -m pytest -q stage3_self_refinement/runtime/tests

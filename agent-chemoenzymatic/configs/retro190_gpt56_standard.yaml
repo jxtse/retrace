@@ -1,0 +1,4 @@
+# Retro-190 GPT-5.6 Sol standard condition.
+# Search budget comes from the standard preset; model reasoning is medium.
+llm:
+  reasoning_effort: medium

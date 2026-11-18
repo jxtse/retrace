@@ -1,0 +1,12 @@
+# `configs/`
+
+YAML overlays layered on the built-in preset (`main.py run ... --config
+configs/<file>.yaml`, or `AGENT_CONFIG=...` for the benchmark drivers).
+
+| File | Purpose |
+|---|---|
+| `qwen36_vllm.yaml` | serve a Qwen3.6-35B-A3B base model from a local vLLM: 65k context, 8k output budget, relaxed tool timeout, tuned compaction |
+
+Overlays are validated at startup; unknown keys are rejected. Endpoints in this
+file are placeholders — override them with the environment variables listed in
+`.env.example`.

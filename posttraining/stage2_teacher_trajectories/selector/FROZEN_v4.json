@@ -1,0 +1,17 @@
+{
+ "frozen_at": "2026-11-02T11:49:08+08:00",
+ "prompt": "prompt_v4.txt",
+ "prompt_sha256": "db26a967d793048f90270d787e7dd5bef8c0aebe78613cce7f0152a608f9d6db",
+ "runner": "seg_select.py",
+ "runner_sha256": "b4957a62345f494374b857731bebc1ac190d155d2a631ba4a5f71559f102e437",
+ "compactor": "assemble/compact_traj.py",
+ "compactor_sha256": "4175024407c47246de33dc7d71092c43f5aa1aacccdf927c50b8185810c37243",
+ "mech_flags": "assemble/mech_flags_v1.py",
+ "mech_flags_sha256": "ac29c51bf875feed7959551fdc1ddaddf72f3578b72df5e024a31ab4158c8caa",
+ "model": "gpt-6-astra through an OpenAI-compatible /v1/responses endpoint, reasoning.effort=high",
+ "samples": 2,
+ "turn_rule": "A turn is kept iff (a) mean overall score over 2 samples >= A2_VALUE_TH (default 7, following the score threshold used by SWE-Prime for segment masking), (b) neither sample lists the turn in risky_turns (risk >= 3), and (c) no deterministic mechanism flag fires. Setting A2_VALUE_TH=0 gives the risk-only veto arm.",
+ "eligibility": "Trajectory kept iff its final best_route was audited VALID by the frozen route audit (SUSPECT/FAKE/ERROR excluded) and the trajectory fits the 131072-token context.",
+ "disclosure": "The selector sees hindsight (the final route plus judge notes). The prompt was tuned on train-side trajectories with non-expert review; it is not an expert label, and dev/test targets were never used.",
+ "notes": "All digests above are the SHA-256 of the files as shipped in this directory; compact_traj.py and mech_flags_v1.py live under assemble/, and prompt_v4.txt / seg_select.py under selector/."
+}

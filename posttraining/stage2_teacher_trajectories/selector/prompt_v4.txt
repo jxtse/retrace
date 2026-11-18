@@ -1,0 +1,59 @@
+You are labelling a teacher agent's trajectory for supervised fine-tuning of a smaller student agent. The student will be trained on the full trajectory as context, but loss will be applied ONLY to the assistant turns inside the segments you select. Your job: split the trajectory into coherent semantic segments, score each one, and pinpoint the individual assistant turns that would be harmful to imitate. Selection rule (fixed, applied by code): every assistant turn is supervised UNLESS you flag it as risky (risk >= 3). Low-value but harmless turns (routine checks, recaps, broad exploration) stay supervised, because the student must also learn the ordinary control loop. So your most important output is an accurate, turn-level list of harmful turns: do not miss real flaws, and do not flag a turn merely because it is redundant or low-value.
+
+## Task setting
+The student is a 27B model that already handles single-step chemistry reasonably but often fails at the agentic control loop: it notices a problem (missing carbon source, wrong connectivity, scorer warning) and then still saves or keeps the flawed route; it repeats searches; it stops exploring too early or explores aimlessly. Segments that show a well-grounded detect → repair → re-score → save chain, careful verification, and sound branch choice are the most valuable to supervise.
+
+The agent plans a multi-step retrosynthesis route for a target molecule using tools: analyze_molecule, validate_smiles, check_buyability, suggest_templates (template library), neural_retro (one-step models), explore_branches, score_route (harness scorer; returns warnings), save_best_route (saves a candidate route to the scratchpad), list_best_routes. The harness runs a fixed 40 assistant turns; it finalises the ranking itself, so the agent never "submits". The route finally selected is the highest-scoring saved route. "[HARNESS PREFETCH, visible to agent]" blocks are tool results the harness inserted before turn A1; the agent HAS seen them, so claims based on them (e.g. which neural engines support a disconnection) are grounded. "[HARNESS USER MESSAGE]" lines are harness nudges, not agent actions. The trajectory is cut at 40 turns by the harness, so an unfinished final exploration is not a fault of the agent.
+
+The exact system prompt the agent was given is below. Judge behaviour against THESE instructions (e.g. it is told to emit `COMPLETE ROUTE FOUND:` once enough distinct routes are saved; doing so is compliant, not premature; the harness may then ask it to continue).
+
+<agent_system_prompt>
+{sysprompt}
+</agent_system_prompt>
+
+The final selected route of this trajectory was independently audited by a frozen chemistry judge as **VALID** (every step chemically defensible). The audited route and the judge's per-step notes are given below. This tells you what ended up correct; it is hindsight information.
+
+## Segmenting
+- A segment is a run of consecutive assistant turns (A<i>..A<j>) with one coherent intent, e.g.: analysing the target; expanding one node and screening candidates; checking buyability of a precursor set; assembling and scoring a route; interpreting a score warning and repairing the route; saving a route; exploring an alternative branch; late-stage re-checking.
+- Segments must cover every assistant turn exactly once, in order, without gaps or overlaps.
+- Typical segment length 1-5 turns. Do not make one giant segment.
+
+## Scoring each segment (integers 0-10)
+1. contribution: Did it move toward the final selected route, or perform a useful verification, a correct repair after a warning/problem, or a justified pruning of a bad branch? Exploration of an alternative that was reasonably motivated still has moderate contribution even if not selected. Redundant re-querying, aimless late exploration and filler score low.
+2. learnability: Judged ONLY from information visible to the agent at that moment (its earlier turns and tool results), is the action a sensible thing to do? Penalise actions that only look good in hindsight, lucky guesses, or claims not supported by the tool outputs seen so far. Visible TEXT reasoning that is accurate and grounded in tool results raises learnability; chemically wrong statements lower it.
+3. risk (higher = more dangerous to imitate): any of: saving/scoring a route that contains a chemically wrong step; ignoring a score_route warning (fabricated carbon, lost skeletal carbon, incomplete route, stock miss) without addressing or explaining it; invented reagents or carbon sources; misreading a tool result; dependence on information the agent did not have; exact duplicate tool calls; unjustified abandonment of a promising branch; wrong statements about chemistry.
+
+Anchors for risk: 0-1 nothing to worry about; 2 minor imprecision that would not mislead the student; 3-5 a concrete flaw that would be harmful to imitate (claim contradicting visible tool output, silently ignored scorer warning, saving a route with a known unaddressed problem, exact duplicate call); 6-10 a chemically wrong action, invented reagent/carbon source, or misread tool result.
+
+Risk is assigned per TURN. A segment's `risk` must equal the maximum risk of the turns you list in its `risky_turns`; if no turn in the segment is risky, `risky_turns` is empty and segment risk is 0-2. Only list the turn(s) whose OWN visible text or tool call contains the flaw. Example: if A9 scores a sound route and A10 saves it while silently ignoring a warning A9 surfaced, list A10 only. If a flawed claim in A9's text motivates A10's action, list both and explain each. Turns in a flagged segment that are themselves fine must NOT be listed.
+
+Then give `overall` (0-10) = your holistic judgement of whether the student should be trained to produce THESE assistant turns in THIS context. A segment with high risk must not get a high overall even if its contribution is high.
+Anchors for overall: 9-10 exemplary behaviour the student should copy; 7-8 sound and useful, worth supervising; 5-6 acceptable but low value (redundant checks, unfocused breadth, long recaps that add nothing); 0-4 flawed, must not be supervised. Use the full range; do not default everything to 8-9.
+
+## Important rules
+- Score the assistant's outputs (visible text + tool calls), not the tool results.
+- Saving routes, scoring routes and listing saved routes are control actions the student must learn. Do not penalise them just because they look mechanical. Score them on whether saving/scoring THAT route at THAT point was right (e.g. saving a route whose own score_route just warned about a problem, without repair or explanation, is risky; saving a sound, complete route is good).
+- Saving a non-selected alternative route is acceptable if the route is chemically sound; it is risky if it contains a step you can identify as chemically wrong.
+- A score_route warning can be a false alarm (e.g. a leaving group the scorer did not count). Explaining it correctly is good; ignoring it silently is risky.
+- Tool results are abbreviated for you (long lists truncated to the first entries; "…[+N chars]" marks truncation). If a claim might be supported by a truncated part, do not penalise it as unsupported; only penalise claims that contradict what is shown.
+- Do not penalise reasonable domain-knowledge statements (e.g. "Boc protection prevents ring-N acylation") as unsupported; penalise chemically wrong statements.
+- Be concrete. Each reason must cite the turn(s) and what was done.
+
+## Output
+Return ONLY a JSON object:
+{"segments": [{"start": <int turn number>, "end": <int>, "intent": "<short>", "contribution": <0-10>, "learnability": <0-10>, "risk": <0-10>, "overall": <0-10>, "reason": "<1-2 sentences>", "risky_turns": [{"turn": <int>, "risk": <3-10>, "reason": "<1 sentence: the concrete flaw in this turn>"}]}], "trajectory_notes": "<2-3 sentences: overall quality, main good behaviours, main problems>"}
+
+## Target
+{target}
+
+## Final selected route (audited VALID)
+{route}
+
+## Judge notes on the selected route
+{judge}
+
+## Process flags computed by the harness logs
+{flags}
+
+## Trajectory (assistant turns numbered A1..A{n}; tool results abbreviated)
+{traj}

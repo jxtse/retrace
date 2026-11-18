@@ -1,0 +1,122 @@
+{
+  "execution_root": "/path/to/retrace-share/stage3-endtoend/authorized-training/execution-v2",
+  "runtime": "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime",
+  "manifest": "/path/to/retrace-share/stage3-endtoend/authorized-training/integration/exports-owner-v2/7a1567a3765e8797427b00214f859d79474539cbe529a48e154c3975c58d9d95/FINAL_SELECTED_MANIFEST.json",
+  "manifest_sha256": "bf9c4c6e584d4364b76fc7eac013c380a43bc47416de143f9eaaca5d06582bae",
+  "smoke_run": "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime/smoke-run-v2",
+  "full_run": "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime/full-run-v2",
+  "export_dir": "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime/full-run-v2-export",
+  "stages": [
+    {
+      "name": "smoke-train",
+      "argv": [
+        "/path/to/retrace-share/swift-env/venv-swift/bin/python",
+        "-B",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime-owner-cli-v2/src/owner_launcher.py",
+        "--stage",
+        "smoke",
+        "--execute-owner",
+        "--manifest",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/integration/exports-owner-v2/7a1567a3765e8797427b00214f859d79474539cbe529a48e154c3975c58d9d95/FINAL_SELECTED_MANIFEST.json",
+        "--manifest-sha256",
+        "bf9c4c6e584d4364b76fc7eac013c380a43bc47416de143f9eaaca5d06582bae",
+        "--native-acceptance",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime/native-production-real-001/report.json",
+        "--pins",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime/SOURCE_PINS.owner-authorized-v1.json",
+        "--out",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime/smoke-run-v2"
+      ]
+    },
+    {
+      "name": "smoke-reload",
+      "argv": [
+        "/path/to/retrace-share/swift-env/venv-swift/bin/python",
+        "-B",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime-owner-cli-v2/src/reload_verifier.py",
+        "--run",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime/smoke-run-v2",
+        "--execute-owner"
+      ]
+    },
+    {
+      "name": "smoke-gate",
+      "argv": [
+        "/path/to/retrace-share/swift-env/venv-swift/bin/python",
+        "-B",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime-owner-cli-v2/src/finalize_optimizer_gate.py",
+        "--run",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime/smoke-run-v2",
+        "--write-gate"
+      ]
+    },
+    {
+      "name": "full-train",
+      "argv": [
+        "/path/to/retrace-share/swift-env/venv-swift/bin/python",
+        "-B",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime-owner-cli-v2/src/owner_launcher.py",
+        "--stage",
+        "full",
+        "--execute-owner",
+        "--manifest",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/integration/exports-owner-v2/7a1567a3765e8797427b00214f859d79474539cbe529a48e154c3975c58d9d95/FINAL_SELECTED_MANIFEST.json",
+        "--manifest-sha256",
+        "bf9c4c6e584d4364b76fc7eac013c380a43bc47416de143f9eaaca5d06582bae",
+        "--native-acceptance",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime/native-production-real-001/report.json",
+        "--pins",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime/SOURCE_PINS.owner-authorized-v1.json",
+        "--out",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime/full-run-v2",
+        "--optimizer-gate",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime/smoke-run-v2/optimizer-gate.json"
+      ]
+    },
+    {
+      "name": "full-reload",
+      "argv": [
+        "/path/to/retrace-share/swift-env/venv-swift/bin/python",
+        "-B",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime-owner-cli-v2/src/reload_verifier.py",
+        "--run",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime/full-run-v2",
+        "--execute-owner"
+      ]
+    },
+    {
+      "name": "full-gate",
+      "argv": [
+        "/path/to/retrace-share/swift-env/venv-swift/bin/python",
+        "-B",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime-owner-cli-v2/src/finalize_optimizer_gate.py",
+        "--run",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime/full-run-v2",
+        "--write-gate"
+      ]
+    },
+    {
+      "name": "export-trained-adapter",
+      "argv": [
+        "/path/to/retrace-share/swift-env/venv-swift/bin/python",
+        "-B",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime/src/export_adapter.py",
+        "--run",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime/full-run-v2",
+        "--checkpoint",
+        "{LAST_CHECKPOINT}",
+        "--owner-validation",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime/full-run-v2/optimizer-gate.json",
+        "--pins",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime/SOURCE_PINS.owner-authorized-v1.json",
+        "--out",
+        "/path/to/retrace-share/stage3-endtoend/authorized-training/runtime/full-run-v2-export"
+      ]
+    }
+  ],
+  "owner_decision_sha256": "aef59e13ac93a761f9394a8b965d2d9610017a9277b853608eb99cef2e8cdb7d",
+  "do_not_claim_full_training_from_smoke": true,
+  "reused_native_report": "runtime/native-production-real-001/report.json",
+  "original_failed_chain": "execution-v1",
+  "change": "CLI delete maps to unchanged effective template raise; no scientific/recipe/data/source-pin change"
+}

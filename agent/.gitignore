@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Agent sessions, run outputs and caches (regenerable, may contain transcripts)
+.sessions/
+.cache/
+runs/
+logs/
+*.log
+eval_results/
+test_runs/
+final_results/
+results/
+dataset/benchmark/*/runs*/
+dataset/benchmark/*/results/
+!dataset/benchmark/*/results/README.md
+scripts/figs/out/
+
+# Benchmark inputs are not distributed; keep any local copies out of Git
+dataset/**/*.csv
+dataset/**/*.xlsx
+dataset/**/*.pkl
+dataset/**/*.sdf
+dataset/**/*.jsonl
+
+# Frontend build output
+webapp/client/node_modules/
+webapp/client/dist/
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.bak
+*.bak.*
+*.bak_*
+*.bak-*

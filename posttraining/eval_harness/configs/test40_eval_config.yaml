@@ -1,0 +1,52 @@
+# Frozen Test40 evaluation configuration (Qwen3.8-27B, 4 shards x 10 targets, h0/h1).
+# Captured from the isolated evaluation runtime; this header describes it.
+llm:
+  base_url: http://127.0.0.1:8021/v1
+  model: qwen3.8-27b-s3
+  temperature: 0.7
+  reasoning_effort: medium
+  max_tokens: 32768
+  context_window: 131072
+  fixed_output_budget: true
+  fallback:
+    enabled: false
+postprocess:
+  enabled: false
+agent:
+  tool_timeout_s: 900
+  max_iterations: 40
+  tools_allowlist:
+  - validate_smiles
+  - analyze_molecule
+  - check_buyability
+  - neural_retro
+  - suggest_templates
+  - explore_branches
+  - score_route
+  - save_best_route
+  - list_best_routes
+  target_prefetch: user_message
+  mini_status_every: 0
+  iteration_mode: plain
+  user_nudges_enabled: false
+  complete_grace_turns: 2
+prompts:
+  core: prompts/core_lean.md
+neural_retro:
+  retroplanner_http_timeout_s: 180
+  retroplanner_http_retries: 3
+  precursor_sanity_filter:
+    enabled: false
+verifier:
+  feasibility:
+    judge:
+      enabled: false
+    rater:
+      http_url:
+      - http://127.0.0.1:8001/retroplanner/api/reaction_rater
+      timeout_s: 60.0
+compaction:
+  enabled: false
+  max_tokens: 48000
+  auto_compact_threshold: 0.85
+  micro_compact_threshold: 0.5

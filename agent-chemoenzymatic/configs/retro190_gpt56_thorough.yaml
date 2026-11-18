@@ -1,0 +1,4 @@
+# Retro-190 GPT-5.6 Sol thorough condition.
+# Use xhigh (rather than max) to retain a bounded, reproducible comparison.
+llm:
+  reasoning_effort: xhigh

@@ -1,0 +1,36 @@
+{
+ "_note": "Integrity pins for the frozen audit modules in this directory: sha256 is the digest of each file as shipped here, so adapter.py can refuse to run if one changes. extracted_from records where the module came from when the audit was frozen; it is a description, not a path in this repository.",
+ "audit_driver.py": {
+  "extracted_from": "route_audit_v1/audit_driver.py (S3 audit campaign driver)",
+  "sha256": "279f311d132402641e51aa80f62dd4107920f3ae50c09ed33581b6d8e7788f02"
+ },
+ "AUDIT_SPEC.md": {
+  "extracted_from": "route_audit_v1/AUDIT_SPEC.md (audit protocol)",
+  "sha256": "5fcc6c6712188bab612b25d166fdde12077fb0f15480bd4b650ef5247549c075"
+ },
+ "SPLIT_STAGE2.json": {
+  "extracted_from": "admission/v1/SPLIT_STAGE2.json (train/dev/test split used for S3)",
+  "sha256": "ea76470d8ae418e2d4b2a8cb9f0a203b5842362ba4a6d439714845fbd49273b6"
+ },
+ "validators.py": {
+  "extracted_from": "run_audit.py (audit validators, imported as functions)",
+  "functions": [
+   "require",
+   "response_text",
+   "validate_adv",
+   "validate_deep"
+  ],
+  "sha256": "2a28aa94ee13b3f86c8e6214ade15c660d91de5c96462f535557e908b378d8e7"
+ },
+ "grounding.py": {
+  "extracted_from": "grounding_reference.py (route grounding, imported as functions)",
+  "functions": [
+   "canon",
+   "carbon_count",
+   "ground_step",
+   "parse_step",
+   "ring_sizes"
+  ],
+  "sha256": "5c4c021acfa633a11ea1daf4f5f8b3edf66036099f1414a94b0eaa9da972d267"
+ }
+}

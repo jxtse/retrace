@@ -1,0 +1,39 @@
+# Student rollout config: Qwen3.8-27B base served by vLLM on one GPU node.
+# Adapted from configs/qwen36_vllm.yaml (the config used for earlier Qwen
+# rollout collection). Single-target smoke for the continual-learning extension;
+# not a benchmark evaluation.
+llm:
+  base_url: http://127.0.0.1:8000/v1
+  model: qwen3.8-27b-student
+  temperature: 0.7        # on-policy sampling keeps stochasticity (eval used 0.2)
+  reasoning_effort: low   # medium hit 64-minute turns (8k->16k->32k->53k reasoning-
+                          # truncation re-requests); low for the smoke rollout.
+  max_tokens: 32768       # generous initial budget so a long think does not trigger
+                          # the double-and-regenerate retry ladder; 64k ctx - ~12k prompt.
+  context_window: 65536
+  fallback:
+    enabled: false        # no silent cross-model fallback in captured data
+postprocess:
+  enabled: false          # no external LLM reviewer; self-contained on the policy
+agent:
+  tool_timeout_s: 900
+  max_iterations: 30
+neural_retro:
+  # retroplanner is reached through an SSH tunnel; override the configured
+  # URL list with the RETROPLANNER_HTTP_URL environment variable.
+  retroplanner_http_timeout_s: 180
+  retroplanner_http_retries: 3
+  precursor_sanity_filter:
+    enabled: false        # same as qwen36_vllm: no localhost:4141 judge path
+verifier:
+  feasibility:
+    judge:
+      enabled: false      # same as qwen36_vllm: no external LLM judge
+    rater:
+      http_url:
+        - http://127.0.0.1:8001/retroplanner/api/reaction_rater   # same host-d host, via tunnel
+      timeout_s: 60.0
+compaction:
+  max_tokens: 48000
+  auto_compact_threshold: 0.85
+  micro_compact_threshold: 0.5

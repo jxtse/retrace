@@ -1,0 +1,4 @@
+# Coley SCScore weights (numpy export converted from the MIT-licensed SCScore model).
+# Bundled so the cost/SA pillars of score_route work offline.
+# See LICENSES.md for the upstream license.
+!weights.json.gz

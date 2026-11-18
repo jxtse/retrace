@@ -1,0 +1,11 @@
+{
+  "data_origin": "synthetic",
+  "training_ready": false,
+  "claim": "Engineering-only two-selector arithmetic and mask fixture; no scientific judgments",
+  "overall1": [8, 6, 8, 9],
+  "overall2": [6, 7, 8, 9],
+  "risky1": [0, 0, 3, 0],
+  "risky2": [0, 0, 0, 0],
+  "mechanical_veto": [false, false, false, true],
+  "expected_keep": [true, false, false, false]
+}

@@ -1,0 +1,89 @@
+# Agent config override: serve a Qwen3.6-35B-A3B base model from a local vLLM
+# server (OpenAI-compatible /v1/chat/completions). This is the config used for
+# the on-policy rollout collection behind the post-training recipes.
+# Usage: AGENT_CONFIG=configs/qwen36_vllm.yaml ... run_benchmark.py
+llm:
+  # The served node is usually reached through an SSH tunnel; point base_url at
+  # whatever the tunnel exposes locally.
+  base_url: http://localhost:8000/v1
+  model: qwen3.6-35b-a3b
+  temperature: 0.2
+  # vLLM serves this model at max_model_len=65536 (input+output share that
+  # budget). A 32768 output reservation leaves only ~32k for the prompt, so
+  # multi-turn retro searches overflow (input>32769 -> 65537>65536 -> vLLM
+  # 400 Bad Request -> native_bailout -> empty run). 8192 is ample for a
+  # single agent turn and leaves ~57k for the growing conversation.
+  max_tokens: 8192
+  # Total vLLM context window. Lets the chat-completions client grow the
+  # output budget within real headroom when the model truncates mid-reasoning
+  # (finish_reason=length, empty content, non-empty reasoning_content) instead
+  # of retrying the identical 8192-budget request repeatedly. On such an empty
+  # the client re-requests at 16384/32768/headroom until content appears; the
+  # next turn starts fresh from max_tokens=8192.
+  context_window: 65536
+  fallback:
+    enabled: false
+
+postprocess:
+  # Rollout and eval runs must stay self-contained on the served policy. The
+  # base config enables an LLM reviewer on a local proxy; when that proxy is
+  # absent it creates noisy "anthropic request failed" fallback paths after
+  # otherwise valid route attempts.
+  enabled: false
+
+agent:
+  # A small served model runs roughly 4x slower than a frontier API model.
+  # score_route makes internal LLM judge/feasibility sub-calls that would
+  # otherwise blow the default 300 s per-tool wallclock and get cancelled,
+  # leaving routes unscored/unsaved. Raise the per-tool budget so slow-model
+  # sub-calls can finish.
+  tool_timeout_s: 900
+  # Cap iterations for rollout collection: a base model that never finalizes
+  # loops in explore+backtrack up to the standard preset's max_iterations (100),
+  # making every non-finalizing case a ~1 h marathon. A model that can finalize
+  # does so well within 30 billable (suggest_templates / neural_retro) iterations,
+  # so the cap bounds the non-finalizing tail without penalizing finalizing cases.
+  max_iterations: 30
+
+neural_retro:
+  precursor_sanity_filter:
+    # In rollout collection neural_retro is used as a candidate generator only.
+    # Keep the advisory sanity judge disabled so this config never reaches for
+    # the local judge path.
+    enabled: false
+    # Optional: route the precursor sanity judge to a fast, cheap model instead of
+    # the slow local base model. The judge is a trivial "is this precursor set
+    # obviously broken?" classification. It fails open, so an unreachable or
+    # unauthorized endpoint degrades to keep-all-precursors and never blocks a
+    # run. base_url/model can also be overridden at launch via
+    # SANITY_JUDGE_BASE_URL / SANITY_JUDGE_MODEL.
+    judge_llm:
+      base_url: http://localhost:4141/v1
+      model: gpt-5.5
+      reasoning_effort: low
+
+verifier:
+  feasibility:
+    judge:
+      # Optional LLM-judge safety net for the feasibility pillar, pinned to a
+      # model different from the main agent so that scores stay comparable
+      # across runs that use different main agents. It only triggers when the
+      # reaction rater is below threshold, and it fails open. Leave it off for
+      # rollout collection (it removes a per-low-step call without changing
+      # scores); set enabled: true for a judge-pinned evaluation pass.
+      enabled: false
+      base_url: http://localhost:4141/v1
+      model: claude-opus-4-8
+
+compaction:
+  # vLLM serves this model at max_model_len=65536. The default compaction
+  # budget (180k, trigger at 0.85 = 153k) is sized for a much larger API window,
+  # so history grows past 65536 and vLLM rejects the request with 400 long
+  # before compaction ever fires. Align the compaction window to the real vLLM
+  # context: 48000 (trigger ~40.8k) leaves a ~16k buffer that absorbs a single
+  # large tool result (neural_retro / suggest_templates can spike the prompt by
+  # ~6k in one turn).
+  max_tokens: 48000
+  auto_compact_threshold: 0.85
+  # Compact more aggressively between auto-compactions too.
+  micro_compact_threshold: 0.5

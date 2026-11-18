@@ -1,0 +1,1 @@
+You've saved {n_saved} candidate routes (soft threshold {threshold}). The comparison set is informative. If a meaningfully different disconnection strategy is still worth exploring, continue. Otherwise you can stop proposing new routes — the system will finalise the ranking on its own when it decides to stop. Do not declare completion yourself.

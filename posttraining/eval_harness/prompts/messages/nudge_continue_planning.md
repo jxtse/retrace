@@ -1,0 +1,1 @@
+Continue planning. Save each strategically-distinct candidate via `save_best_route` (the scratchpad dedups for you). Use `check_buyability` (batched via `smiles_list`) to verify each precursor. The system will finalise the ranking and stop the loop on its own — do not declare completion yourself.

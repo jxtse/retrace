@@ -1,0 +1,1 @@
+You have called `{tool_name}` with the same arguments {n} times. That path isn't progressing — change the disconnection, try a different tool (e.g. `neural_retro` with engine='rxngraphormer', `suggest_templates` with a different `kind`{recall_hint}), or call `backtrack_and_summarize` to reset this branch.

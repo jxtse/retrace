@@ -1,0 +1,14 @@
+{
+ "authorization": "owner-approved enum normalization plus two missing adversarial defenses",
+ "mapping": {
+  "CHEMOSELECTIVITY": "OTHER"
+ },
+ "new_stage_allowlist": [
+  "base:99:1",
+  "base:110:1"
+ ],
+ "original_prompt_and_aggregation": "unchanged",
+ "scope": "all saved stage1 responses in both arms; no verdict or reason changes",
+ "version": "enum-normalization-v1",
+ "workers": 1
+}

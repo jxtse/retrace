@@ -1,0 +1,20 @@
+# Full-trajectory teacher-data collection: no postprocess continuation and no
+# context compaction. 300k is the built-in GPT/Claude context ceiling; this
+# intentionally preserves the exact full message history for SFT.
+# llm.max_tokens is the PER-COMPLETION cap sent to the backend. The gateway
+# returns 502 above ~125k for reasoning models, so pin a safe 100k.
+llm:
+  max_tokens: 100000
+postprocess:
+  enabled: false
+compaction:
+  enabled: false
+  max_tokens: 300000
+  auto_compact_threshold: 1.0
+  micro_compact_threshold: 1.0
+result_store:
+  # Keep every tool result verbatim in the teacher's live context. The
+  # default ring retains only four results per tool and replaces older ones
+  # with load_result stubs even when threshold compaction is disabled.
+  keep_recent_full_per_tool: 100000
+  retention_days: 30

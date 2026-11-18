@@ -1,0 +1,37 @@
+[project]
+name = "retrosynthesis-agent"
+version = "0.1.0"
+description = "A ReACT-style LLM agent for chemoenzymatic retrosynthesis planning"
+requires-python = ">=3.11"
+dependencies = [
+    "requests",
+    "pyyaml",
+    "pandas",
+    "numpy",
+    "rdkit",
+    "meeko>=0.7.1",
+    # Pydantic v2 — boundary type-safety for the LLM client + config schema.
+    "pydantic>=2.5",
+    # rdchiral powers the curated template library (apply_template /
+    # suggest_templates / template_library). The in-process graph_retrosyn
+    # (DMPNNFP) + rxngraphormer engines were removed 2026-06-08 — all neural
+    # one-step prediction now goes through the retroplanner HTTP service — so
+    # torch-geometric / torch-scatter / torch-sparse / modelscope are no
+    # longer agent-venv dependencies.
+    "tqdm",
+    "rdchiral",
+    # Multi-dimensional route verifier (`tools/verifier/`):
+    # - ReactionT5v2-forward (HuggingFace) for feasibility round-trip
+    # - molbloom for ZINC20 leaf-buyability bloom filter
+    "transformers",
+    "safetensors",
+    "molbloom",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

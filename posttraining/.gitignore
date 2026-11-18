@@ -1,0 +1,24 @@
+# run artefacts — never committed
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv*/
+venv*/
+runtime/evidence/*
+runtime/evidence/fix/*
+*runs/
+snapshots/
+campaign-*/
+checkpoints/
+checkpoint-*/
+final-adapter/
+adapter_model.safetensors
+*.log
+*.jsonl
+*.parquet
+*.arrow
+*.tar.gz
+*.safetensors
+
+# keep the scratch dir the offline tests need
+!runtime/evidence/fix/.gitkeep

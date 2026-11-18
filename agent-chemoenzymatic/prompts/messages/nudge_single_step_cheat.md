@@ -1,0 +1,1 @@
+REJECTED: Your single-step route uses leaves that are structurally too close to the target — they are the answer in disguise, not legitimate starting materials. Offenders: {offenders}. Propose a real multi-step disconnection that breaks the target's core scaffold.

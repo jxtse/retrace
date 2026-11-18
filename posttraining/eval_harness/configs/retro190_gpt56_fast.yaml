@@ -1,0 +1,5 @@
+# Retro-190 GPT-5.6 Sol fast condition.
+# Keep the fast search-budget preset, but use the lowest non-zero reasoning
+# effort supported by GPT-5.6 Sol for tool-using agent work.
+llm:
+  reasoning_effort: low
