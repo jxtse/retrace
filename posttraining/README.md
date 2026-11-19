@@ -2,7 +2,7 @@
 
 Code for the post-training stage of ReTRACE (Qwen3.8-27B plus a LoRA adapter):
 the three-stage curriculum (reference-guided critique → teacher-trajectory SFT →
-student self-refinement), the direct teacher-SFT comparison arm, the online
+student self-refinement), the direct teacher-SFT comparison arm, the on-policy
 self-distillation (OPSD) and GRPO recipes, the evaluation launchers, the route
 audit adapters and the metric computation.
 
@@ -67,7 +67,7 @@ posttraining/
 | **Stage 3 collection.** The stage-2 student samples its own trajectories on train targets. | `stage3_self_refinement/collect/launch_collect.py`, `prepare_isolated.py`, `chain_collect.sh`, `canary_admit_v1.py`. |
 | **Stage 3 admission.** Completion to purchasable stock, clean infrastructure, turn-level action screening, VALID audit. | `stage3_self_refinement/screen/validate_screen.py` (+ `test_validate_screen.py`, `RUBRIC.md`), `runtime/src/admission_candidate.py`, `evidence_gates.py`, `contract.py`. |
 | **Stage 3 training.** From the stage-2 checkpoint with a fresh optimizer, supervising visible actions and tool calls only. | `admission/run_authorized_training_chain.py`, `bridge_owner_v2.py`, `configs/stage3_train_chain_v2.json`, `runtime/src/train_s3.py`, `runtime/src/pretokenized_v3.py`, `data_prep/pretokenized.py`, `runtime/tests/`. |
-| **Online arm — OPSD.** Steps of serve → rollout → row build → train → export against a frozen teacher with a privileged audited route; GJS β=0.5, T=1.0, top-64 teacher logits, visible tokens only, Megatron-SWIFT GKD, TP4 + SP, AdamW, LR 2e-5. | `online_opsd/driver/opsd_driver.py`, `build/s0_privileged.py`, `s0_build.py`, `s2_rows.py`, `s2b_build.py`, `build/s2b_template.py` (loss-mask template plugin), `run/opsd_run_train.sh`, `run/opsd_serve.py`, `lib/*`. |
+| **Online arm — OPSD.** Steps of serve → rollout → row build → train → export against a frozen copy of the base model as teacher, given a privileged audited route; GJS β=0.5, T=1.0, top-64 teacher logits, visible tokens only, Megatron-SWIFT GKD, TP4 + SP, AdamW, LR 2e-5. | `online_opsd/driver/opsd_driver.py`, `build/s0_privileged.py`, `s0_build.py`, `s2_rows.py`, `s2b_build.py`, `build/s2b_template.py` (loss-mask template plugin), `run/opsd_run_train.sh`, `run/opsd_serve.py`, `lib/*`. |
 | **Online arm — GRPO.** ms-swift GRPO with a verdict-shaped reward. Build and replay seam only. | `online_grpo/retrace_reward.py` (reward ORM plugin), `retrace_template.py`, `retrace_replay.py` (wire log → training row + teacher view), `replay_grpo_trainer.py`, `run_grpo_replay.py`, `test_spans.py`. |
 | **Optimisation.** LoRA r8 α16 dropout 0.05 on attention, linear-attention and MLP projections, bf16, ms-swift + ZeRO-3, LR 2e-5 constant, one epoch, global batch 4, seed 42, max length 16,384 (stage 1) and 131,072 with sequence parallelism 4 (stages 2–3). | `stage1_critique/train/run_s1v2.sh`, `stage2_teacher_trajectories/train/run_a1v2.sh`, `teacher_sft/run_teacher_sft_base.sh`, `configs/stage3_train_chain_v2.json`, `runtime/src/train_s3.py`. |
 | **Evaluation protocol.** Temperature 0.7, 32,768-token generation cap, 131,072 context, 40 rounds, 14,400 s per target, one archived result per target. | `evaluation_test40/{base,s1v2,teachersft}/launch_*.py`, `*_scan.py`, `snapshot_*.py`, `stop_*_serving.py`; harness: `eval_harness/`. |

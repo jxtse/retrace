@@ -2,7 +2,7 @@
 
 [Paper (arXiv:2610.24744)](https://arxiv.org/abs/2610.24744) · [Model](https://huggingface.co/jxtse/ReTRACE-27B-latest) · [Training data](https://huggingface.co/datasets/jxtse/ReTRACE-train-data)
 
-ReTRACE is an LLM-coordinated retrosynthesis agent with a chemistry tool layer around it. A coordinator model plans in a ReACT loop and calls tools instead of answering from memory: RDKit operations (parse/validate, analyse, compare, identify disconnections), template-based single-step expansion over a curated USPTO reaction-template library, template-free single-step prediction through an external retroplanner HTTP service (for example GraphFP, RXNGraphormer, ChemBART and a ring-breaker model), purchasability lookup for proposed leaves, a route memory of precedent reactions, and a multi-criterion route scorer that rates feasibility, cost and greenness. Saved routes can be checked with the separate route-audit pipeline in `posttraining/chemistry_audit/`. The repository also contains the post-training code used to train the coordinator: critique-oriented SFT, teacher trajectories, self-refinement, teacher SFT, and online self-distillation / GRPO recipes, plus the evaluation harness and metric code used to compare them.
+ReTRACE is an LLM-coordinated retrosynthesis agent with a chemistry tool layer around it. A coordinator model plans in a ReACT loop and calls tools instead of answering from memory: RDKit operations (parse/validate, analyse, compare, identify disconnections), template-based single-step expansion over a curated USPTO reaction-template library, template-free single-step prediction through an external retroplanner HTTP service (for example GraphFP, RXNGraphormer, ChemBART and a ring-breaker model), purchasability lookup for proposed leaves, a route memory of precedent reactions, and a multi-criterion route scorer that rates feasibility, cost and greenness. Saved routes can be checked with the separate route-audit pipeline in `posttraining/chemistry_audit/`. The repository also contains the post-training code used to train the coordinator: critique-oriented SFT, teacher trajectories, self-refinement, teacher SFT, and on-policy self-distillation (OPSD) and GRPO recipes, plus the evaluation harness and metric code used to compare them.
 
 ## Directories
 
@@ -15,7 +15,7 @@ ReTRACE is an LLM-coordinated retrosynthesis agent with a chemistry tool layer a
 | `posttraining/stage2_teacher_trajectories/` | Stage 2: teacher trajectory collection, segment selection, assembly, and the teacher-trajectory SFT recipe. | You are building the teacher-trajectory stage. |
 | `posttraining/stage3_self_refinement/` | Stage 3: student self-sampling on train targets, admission, screening, runtime contracts, training and adapter export. | You are running the self-refinement stage. |
 | `posttraining/teacher_sft/` | Direct teacher-trajectory SFT baseline (no stage-1 adapter). | You need the teacher-SFT comparison arm. |
-| `posttraining/online_opsd/` | Online on-policy self-distillation with a frozen teacher. | You want the online distillation objective. |
+| `posttraining/online_opsd/` | On-policy self-distillation (OPSD): the frozen base model, given an audited route in context, teaches the current student on the student's own rollouts. | You want the OPSD comparison arm. |
 | `posttraining/online_grpo/` | GRPO replay trainer: replay records, reward, templates, span tests. | You want the RL arm. |
 | `posttraining/evaluation_test40/` | Per-arm evaluation launchers (plan/execute/scan/snapshot/stop) for the held-out target set. | You are launching or auditing an evaluation run. |
 | `posttraining/chemistry_audit/` | The route audit pipeline: deterministic RDKit checks, LLM deep read, adversarial defence, validators, grounding. | You want to audit saved routes or reproduce route verdicts. |
@@ -96,7 +96,7 @@ The stages map to directories as follows:
 | 1. critique / rejection sampling | `posttraining/stage1_critique/` | an S1 adapter (LoRA) |
 | 2. teacher trajectories | `posttraining/stage2_teacher_trajectories/` | filtered teacher-trajectory SFT rows and a stage-2 adapter |
 | 3. self-refinement | `posttraining/stage3_self_refinement/` | student self-sampled rows, admission, S3 adapter |
-| comparison arms | `posttraining/teacher_sft/`, `posttraining/online_opsd/`, `posttraining/online_grpo/` | teacher-SFT, online distillation and GRPO adapters |
+| comparison arms | `posttraining/teacher_sft/`, `posttraining/online_opsd/`, `posttraining/online_grpo/` | teacher-SFT, OPSD and GRPO adapters |
 | evaluation | `posttraining/evaluation_test40/`, `posttraining/chemistry_audit/`, `posttraining/metrics/` | run archives, route verdicts, metric tables |
 
 Entry points are documented in `posttraining/README.md`.
