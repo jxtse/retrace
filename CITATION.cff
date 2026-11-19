@@ -1,0 +1,37 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the paper below."
+title: "ReTRACE"
+type: software
+license: MIT
+repository-code: "https://github.com/jxtse/retrace"
+authors:
+  - family-names: Xie
+    given-names: Jinxiang
+  - family-names: Zhang
+    given-names: Yijian
+  - family-names: Yi
+    given-names: Qingyuan
+  - family-names: Wang
+    given-names: Jianyi
+  - family-names: Dong
+    given-names: Hao
+preferred-citation:
+  type: article
+  title: "ReTRACE: Feedback-Guided LLM Agent in a Chemistry Harness for Retrosynthesis Planning"
+  authors:
+    - family-names: Xie
+      given-names: Jinxiang
+    - family-names: Zhang
+      given-names: Yijian
+    - family-names: Yi
+      given-names: Qingyuan
+    - family-names: Wang
+      given-names: Jianyi
+    - family-names: Dong
+      given-names: Hao
+  year: 2026
+  journal: "arXiv preprint"
+  identifiers:
+    - type: other
+      value: "arXiv:2610.24744"
+  url: "https://arxiv.org/abs/2610.24744"

@@ -1,5 +1,7 @@
 # ReTRACE
 
+[Paper (arXiv:2610.24744)](https://arxiv.org/abs/2610.24744) · [Model](https://huggingface.co/jxtse/ReTRACE-27B-latest) · [Training data](https://huggingface.co/datasets/jxtse/ReTRACE-train-data)
+
 ReTRACE is an LLM-coordinated retrosynthesis agent with a chemistry tool layer around it. A coordinator model plans in a ReACT loop and calls tools instead of answering from memory: RDKit operations (parse/validate, analyse, compare, identify disconnections), template-based single-step expansion over a curated USPTO reaction-template library, template-free single-step prediction through an external retroplanner HTTP service (for example GraphFP, RXNGraphormer, ChemBART and a ring-breaker model), purchasability lookup for proposed leaves, a route memory of precedent reactions, and a multi-criterion route scorer that rates feasibility, cost and greenness. Saved routes can be checked with the separate route-audit pipeline in `posttraining/chemistry_audit/`. The repository also contains the post-training code used to train the coordinator: critique-oriented SFT, teacher trajectories, self-refinement, teacher SFT, and online self-distillation / GRPO recipes, plus the evaluation harness and metric code used to compare them.
 
 ## Directories
@@ -99,15 +101,30 @@ The stages map to directories as follows:
 
 Entry points are documented in `posttraining/README.md`.
 
-## Model adapter
+## Model and training data
 
-The stage-3 LoRA adapter released with the paper is published separately:
+| Resource | Hugging Face | Notes |
+|---|---|---|
+| Trained adapter | [`jxtse/ReTRACE-27B-latest`](https://huggingface.co/jxtse/ReTRACE-27B-latest) | LoRA adapter for [`Qwen/Qwen3.8-27B`](https://huggingface.co/Qwen/Qwen3.8-27B), Apache-2.0. The version evaluated in the paper is tag [`s3-v1`](https://huggingface.co/jxtse/ReTRACE-27B-latest/tree/s3-v1); `main` tracks later versions. |
+| Post-training data | [`jxtse/ReTRACE-train-data`](https://huggingface.co/datasets/jxtse/ReTRACE-train-data) | The three curriculum stages used to train the adapter: `stage1_critique` (819 rows), `stage2_teacher_trajectories` (167 rows, also used for the teacher-SFT arm) and `stage3_self_refinement` (26 rows, pretokenized). Access is currently restricted while third-party terms for the teacher-generated content are reviewed. |
 
-**https://huggingface.co/jxtse/ReTRACE-27B-latest** — LoRA adapter for Qwen3.8-27B, Apache-2.0, tag `s3-v1`.
+The adapter is not a standalone model; load it on top of the base model. The training data are consumed by the stage scripts in `posttraining/`.
 
 ## Citation
 
-Citation information will be added upon publication.
+If you use ReTRACE, please cite:
+
+```bibtex
+@misc{xie2026retrace,
+  title         = {ReTRACE: Feedback-Guided LLM Agent in a Chemistry Harness for Retrosynthesis Planning},
+  author        = {Jinxiang Xie and Yijian Zhang and Qingyuan Yi and Jianyi Wang and Hao Dong},
+  year          = {2026},
+  eprint        = {2610.24744},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.AI},
+  url           = {https://arxiv.org/abs/2610.24744}
+}
+```
 
 ## License
 
