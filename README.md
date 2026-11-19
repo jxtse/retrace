@@ -106,7 +106,7 @@ Entry points are documented in `posttraining/README.md`.
 | Resource | Hugging Face | Notes |
 |---|---|---|
 | Trained adapter | [`jxtse/ReTRACE-27B-latest`](https://huggingface.co/jxtse/ReTRACE-27B-latest) | LoRA adapter for [`Qwen/Qwen3.8-27B`](https://huggingface.co/Qwen/Qwen3.8-27B), Apache-2.0. The version evaluated in the paper is tag [`s3-v1`](https://huggingface.co/jxtse/ReTRACE-27B-latest/tree/s3-v1); `main` tracks later versions. |
-| Post-training data | [`jxtse/ReTRACE-train-data`](https://huggingface.co/datasets/jxtse/ReTRACE-train-data) | The three curriculum stages used to train the adapter: `stage1_critique` (819 rows), `stage2_teacher_trajectories` (167 rows, also used for the teacher-SFT arm) and `stage3_self_refinement` (26 rows, pretokenized). Access is currently restricted while third-party terms for the teacher-generated content are reviewed. |
+| Post-training data | [`jxtse/ReTRACE-train-data`](https://huggingface.co/datasets/jxtse/ReTRACE-train-data) | The three curriculum stages used to train the adapter: `stage1_critique` (819 rows), `stage2_teacher_trajectories` (167 rows, also used for the teacher-SFT arm) and `stage3_self_refinement` (26 rows, pretokenized). Released for non-commercial research use; teacher-generated content remains subject to its providers' terms (see the dataset card). |
 
 The adapter is not a standalone model; load it on top of the base model. The training data are consumed by the stage scripts in `posttraining/`.
 
