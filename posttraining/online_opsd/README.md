@@ -1,6 +1,6 @@
 # OPSD (on-policy self-distillation) — Megatron-SWIFT GKD
 
-Recipe for the online distillation arm: steps of 16 targets, a fresh LoRA from
+Recipe for the on-policy self-distillation (OPSD) arm: steps of 16 targets, a fresh LoRA from
 base, a frozen base-model teacher whose prompt gets a privileged audited route
 appended, GJS loss (β = 0.5, T = 1.0, top-64 teacher logits), and supervision on
 visible assistant tokens and tool calls only (reasoning excluded).
