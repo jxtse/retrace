@@ -1,3 +1,5 @@
+import shlex
+
 import pytest
 import yaml
 
@@ -101,9 +103,46 @@ def test_chemprice_false_reaches_factory(tmp_path):
     assert verifier.call_args.kwargs["chemprice_enabled"] is False
 
 
+def worker_script_tokens(ssh_argv, host):
+    # OpenSSH joins the arguments after the destination before the remote shell parses them.
+    remote_args = ssh_argv[ssh_argv.index(host) + 1:]
+    shell, flag, script = shlex.split(" ".join(remote_args))
+    assert (shell, flag) == ("bash", "-lc")
+    assert len(remote_args) == 1
+    return shlex.split(script)
+
+
+def test_distributed_dispatch_argv(tmp_path, monkeypatch, isolated_deployment):
+    from subprocess import CompletedProcess
+    from unittest.mock import Mock
+    from core import evaluation
+
+    run = Mock(return_value=CompletedProcess([], 0, "", ""))
+    monkeypatch.setattr(evaluation.subprocess, "run", run)
+    output_dir = tmp_path / "worker results"
+    summary = evaluation.distribute_benchmark(
+        suite_name="retro190", indices=[0, 2], hosts="worker", full_cap=True,
+        max_workers="worker=2", output_dir=output_dir, thinking="thorough",
+    )
+
+    run.assert_called_once()
+    argv, = run.call_args.args
+    assert isinstance(argv, list)
+    assert not run.call_args.kwargs.get("shell", False)
+    assert argv[:-1] == ["ssh", "-n", "-f", "-o", "BatchMode=yes", "-o",
+                         "ConnectTimeout=15", "--", "worker"]
+    assert shlex.split(summary["commands"][0]["cmd"]) == argv
+    tokens = worker_script_tokens(argv, "worker")
+    assert tokens[:3] == ["cd", str(evaluation.REPO_ROOT), "&&"]
+    assert tokens[tokens.index("nohup") + 1:tokens.index(">")] == [
+        ".venv/bin/python", "main.py", "evaluate", "retro190", "--local",
+        "--indices", "0,2", "--workers", "2", "--gpu-ids", "0",
+        "--output-dir", str(output_dir), "--thinking", "thorough", "--skip-existing",
+    ]
+
+
 @pytest.mark.parametrize("explicit", [True, False])
 def test_distributed_config_selection(tmp_path, monkeypatch, explicit):
-    import shlex
     from core import evaluation
 
     monkeypatch.setattr(evaluation, "REPO_ROOT", tmp_path)
@@ -118,7 +157,7 @@ def test_distributed_config_selection(tmp_path, monkeypatch, explicit):
                   hosts="worker", full_cap=True, max_workers="worker=1", dry_run=True,
                   config_path=path.name if explicit else None)
     summary = evaluation.distribute_benchmark(**kwargs)
-    remote_args = shlex.split(shlex.split(summary["commands"][0]["cmd"])[-1])
+    remote_args = worker_script_tokens(shlex.split(summary["commands"][0]["cmd"]), "worker")
     assert remote_args[remote_args.index("--config") + 1] == str(path)
     assert remote_args[remote_args.index("--model") + 1] == "fixture-env-model"
     path.write_text("unknown_option: true")
@@ -147,7 +186,6 @@ def isolated_deployment(monkeypatch):
 def test_pinned_worker_plan(tmp_path, monkeypatch, isolated_deployment,
                             config, env_model, cli_model, expected):
     import json
-    import shlex
     import main
     from core.config import load_benchmark_config
 
@@ -172,7 +210,7 @@ def test_pinned_worker_plan(tmp_path, monkeypatch, isolated_deployment,
     assert len(plan["commands"]) == 2
     for launch in plan["commands"]:
         assert plan["assignments"][launch["host"]]["model"] == expected
-        tokens = shlex.split(shlex.split(launch["cmd"])[-1])
+        tokens = worker_script_tokens(shlex.split(launch["cmd"]), launch["host"])
         worker = parser.parse_args(tokens[tokens.index("main.py") + 1:tokens.index(">")])
         assert worker.local
         assert worker.model == (expected or None)

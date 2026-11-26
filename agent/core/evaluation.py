@@ -330,10 +330,12 @@ def build_distributed_launch_cmd(
         "export LLM_API_KEY && "
         f"nohup {run_cmd} > {log_path} 2>&1 < /dev/null &"
     )
-    return (
-        "ssh -n -f -o BatchMode=yes -o ConnectTimeout=15 "
-        f"{shlex.quote(host)} bash -lc {shlex.quote(inner)}"
-    )
+    # The remote login shell parses this argument before bash receives the script.
+    remote_command = shlex.join(["bash", "-lc", inner])
+    return shlex.join([
+        "ssh", "-n", "-f", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
+        "--", host, remote_command,
+    ])
 
 
 def run_local_benchmark(
@@ -520,8 +522,7 @@ def distribute_benchmark(
         host = entry["host"]
         print(f"[evaluate] launching {host}", file=sys.stderr)
         result = subprocess.run(
-            entry["cmd"],
-            shell=True,
+            shlex.split(entry["cmd"]),
             capture_output=True,
             text=True,
             timeout=launch_timeout_s,
