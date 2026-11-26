@@ -124,3 +124,102 @@ def test_distributed_config_selection(tmp_path, monkeypatch, explicit):
     path.write_text("unknown_option: true")
     with pytest.raises(ValueError, match="unknown_option"):
         evaluation.distribute_benchmark(**kwargs)
+
+
+@pytest.fixture
+def isolated_deployment(monkeypatch):
+    from unittest.mock import Mock
+
+    monkeypatch.setattr("core.evaluation.subprocess.run",
+                        Mock(side_effect=AssertionError("unexpected process launch")))
+    monkeypatch.setenv("_AGENT_DOTENV_LOADED", "1")
+    for name in ("AGENT_CONFIG", "AGENT_MODEL", "AGENT_THINKING", "REACTION_RATER_URL",
+                 "LLM_API_KEY", "LLM_FALLBACK_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+
+
+@pytest.mark.parametrize("config,env_model,cli_model,expected", [
+    (True, None, None, "yaml-model"),
+    (True, "env-model", None, "env-model"),
+    (True, "env-model", "cli-model", "cli-model"),
+    (False, None, None, ""),
+])
+def test_pinned_worker_plan(tmp_path, monkeypatch, isolated_deployment,
+                            config, env_model, cli_model, expected):
+    import json
+    import shlex
+    import main
+    from core.config import load_benchmark_config
+
+    parser = main.build_parser()
+    args = ["evaluate", "retro190", "--indices", "0,1", "--hosts", "one,two",
+            "--max-workers", "one=1,two=1", "--full-cap", "--dry-run",
+            "--output-dir", str(tmp_path)]
+    if config:
+        path = tmp_path / "worker settings.yaml"
+        path.write_text("llm: {model: yaml-model, base_url: https://fixture.invalid}\n"
+                        "neural_retro: {enabled: false}\n")
+        monkeypatch.setenv("AGENT_CONFIG", str(path))
+    if env_model:
+        monkeypatch.setenv("AGENT_MODEL", env_model)
+    if cli_model:
+        args.extend(["--model", cli_model])
+
+    parsed = parser.parse_args(args)
+    assert parsed.func(parsed) == 0
+    plan = json.loads((tmp_path / "distribute_plan.json").read_text())
+    assert plan["model"] == expected
+    assert len(plan["commands"]) == 2
+    for launch in plan["commands"]:
+        assert plan["assignments"][launch["host"]]["model"] == expected
+        tokens = shlex.split(shlex.split(launch["cmd"])[-1])
+        worker = parser.parse_args(tokens[tokens.index("main.py") + 1:tokens.index(">")])
+        assert worker.local
+        assert worker.model == (expected or None)
+        assert worker.config == (str(path) if config else None)
+    if config:
+        with pytest.raises(ValueError, match="verifier.feasibility.rater.http_url"):
+            load_benchmark_config()
+
+
+@pytest.mark.parametrize("contents,override,error", [
+    (None, None, FileNotFoundError),
+    ("llm: [", None, ValueError),
+    ("[]", "cli-model", ValueError),
+    ("llm: {model: '   '}", None, ValueError),
+])
+def test_coordinator_rejects_invalid_selection(tmp_path, isolated_deployment,
+                                               contents, override, error):
+    from core.evaluation import distribute_benchmark
+
+    path = tmp_path / "config.yaml"
+    if contents is not None:
+        path.write_text(contents)
+    with pytest.raises(error):
+        distribute_benchmark(suite_name="retro190", indices=[0], hosts="one",
+                             max_workers="one=1", full_cap=True, dry_run=True,
+                             output_dir=tmp_path, config_path=path, model=override)
+    assert not (tmp_path / "distribute_plan.json").exists()
+
+
+@pytest.mark.parametrize("host,variable", [("openrouter.ai", "OPENROUTER_API_KEY"),
+                                          ("api.openai.com", "OPENAI_API_KEY")])
+@pytest.mark.parametrize("template,public", [
+    ("https://{}", True), ("https://{}:443", True), ("https://{}:8443", False),
+    ("https://fixture.invalid", False), ("https://fixture@{}", False), ("http://{}", False),
+])
+def test_provider_origin(host, variable, template, public, isolated_deployment, monkeypatch):
+    from core.llm_client import LLMClient
+    from services.streaming import _auth_headers
+
+    monkeypatch.setenv(variable, "public-fixture")
+    url = template.format(host) + "/v1"
+    client = LLMClient(base_url=url, model="fixture", fallback_enabled=True, fallback_base_url=url)
+    header = "Bearer public-fixture" if public else None
+    assert client.session.headers.get("Authorization") == header
+    assert _auth_headers(url).get("Authorization") == header
+    monkeypatch.setenv("LLM_API_KEY", "primary-fixture")
+    assert _auth_headers(url)["Authorization"] == "Bearer primary-fixture"
+    monkeypatch.setenv("LLM_FALLBACK_API_KEY", "fallback-fixture")
+    expected = header if public and host == "openrouter.ai" else "Bearer fallback-fixture"
+    assert client._get_fallback_session().headers["Authorization"] == expected

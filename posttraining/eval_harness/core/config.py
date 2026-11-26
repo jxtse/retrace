@@ -273,9 +273,11 @@ def _read_override(path: str | os.PathLike[str] | None) -> dict[str, Any]:
         cfg_path = REPO_ROOT / cfg_path
     try:
         with open(cfg_path, encoding="utf-8") as f:
-            raw = yaml.safe_load(f) or {}
+            raw = yaml.safe_load(f)
     except yaml.YAMLError:
         raise ValueError("invalid YAML syntax in config file") from None
+    if raw is None:
+        return {}
     if not isinstance(raw, dict):
         raise ValueError(f"config override must be a mapping: {cfg_path}")
     return raw

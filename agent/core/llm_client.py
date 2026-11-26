@@ -27,6 +27,7 @@ import os
 import time
 import uuid
 from typing import Any
+from urllib.parse import urlsplit
 
 import requests
 
@@ -120,15 +121,24 @@ def _load_dotenv_once() -> None:
     os.environ["_AGENT_DOTENV_LOADED"] = "1"
 
 
-def primary_api_key(base_url: str) -> str | None:
-    from urllib.parse import urlsplit
-
-    _load_dotenv_once()
+def _public_https_host(base_url: str) -> str | None:
+    """Return the bare authority host only for HTTPS on its default port."""
     origin = urlsplit(base_url)
+    if origin.scheme != "https" or origin.username is not None:
+        return None
+    host, separator, port = origin.netloc.lower().partition(":")
+    if separator and port.lstrip("0") != "443":
+        return None
+    return host
+
+
+def primary_api_key(base_url: str) -> str | None:
+    _load_dotenv_once()
+    host = _public_https_host(base_url)
     key = os.getenv("LLM_API_KEY")
-    if origin.scheme == "https" and origin.netloc == "openrouter.ai":
+    if host == "openrouter.ai":
         key = key or os.getenv("OPENROUTER_API_KEY")
-    if origin.scheme == "https" and origin.netloc == "api.openai.com":
+    if host == "api.openai.com":
         key = key or os.getenv("OPENAI_API_KEY")
     return key
 
@@ -415,9 +425,7 @@ class LLMClient:
         if self._fallback_session is not None:
             return self._fallback_session
         _load_dotenv_once()
-        from urllib.parse import urlsplit
-        origin = urlsplit(self.fallback_base_url)
-        if origin.scheme == "https" and origin.netloc == "openrouter.ai":
+        if _public_https_host(self.fallback_base_url) == "openrouter.ai":
             key = os.getenv("OPENROUTER_API_KEY")
         else:
             key = os.getenv("LLM_FALLBACK_API_KEY")

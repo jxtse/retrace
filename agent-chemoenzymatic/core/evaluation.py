@@ -22,7 +22,6 @@ from rdkit import Chem
 
 from core.agent_factory import build_agent
 from core.config import load_config
-from core.deployment import validate_deployment
 from core.llm_client import _load_dotenv_once
 from core.route_text import parse_route_from_text
 
@@ -409,10 +408,13 @@ def distribute_benchmark(
     config = (REPO_ROOT / Path(selected).expanduser()).resolve() if selected else None
     effective_model = model or os.getenv("AGENT_MODEL")
     if config is not None:
-        validate_deployment(load_config(
+        loaded_config = load_config(
             config, thinking=thinking,
             cli_overrides={"llm": {"model": effective_model}} if effective_model else None,
-        ))
+        )
+        effective_model = loaded_config["llm_model"]
+        if not (effective_model or "").strip():
+            raise ValueError("llm.model requires a served model ID")
 
     print(f"[evaluate] suite={suite.cli_name} indices={len(selected_indices)}", file=sys.stderr)
     print(f"[evaluate] output_dir={out_dir}", file=sys.stderr)
@@ -477,7 +479,7 @@ def distribute_benchmark(
             "workers": len(idxs),
             "thinking": thinking,
             "config_override": str(config) if config else "",
-            "model": model or "",
+            "model": effective_model or "",
             "variants": variants or suite.default_variants or "",
         }
         commands.append({"host": host, "cmd": cmd})
@@ -487,7 +489,7 @@ def distribute_benchmark(
         "output_dir": str(out_dir),
         "thinking": thinking,
         "config_override": str(config) if config else "",
-        "model": model or "",
+        "model": effective_model or "",
         "total_indices": len(selected_indices),
         "total_workers": total_workers,
         "unassigned": unassigned,
