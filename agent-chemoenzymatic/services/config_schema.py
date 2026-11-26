@@ -123,13 +123,15 @@ def validate_config(raw: dict, strict: bool = True) -> int:
         AgentConfig.model_validate(raw_for_validation)
     except ValidationError as exc:
         typo_hint = _format_typo_hints(exc)
+        fields = "\n".join(".".join(map(str, err["loc"])) + ": " + err["type"]
+                           for err in exc.errors(include_input=False))
         msg = (
             "agent config has validation errors (typos or unknown keys "
             "are flagged as `extra forbidden`; fix them or set strict=False "
-            f"to downgrade to a warning):\n{typo_hint}  {exc}"
+            f"to downgrade to a warning):\n{typo_hint}  {fields}"
         )
         if strict:
-            raise ConfigValidationError(msg) from exc
+            raise ConfigValidationError(msg) from None
         logger.warning("config: %s", msg)
         return len(exc.errors())
 

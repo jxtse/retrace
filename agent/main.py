@@ -8,6 +8,8 @@ import json
 import logging
 import textwrap
 
+from core.deployment import validate_deployment
+from core.llm_client import _load_dotenv_once
 from core import build_agent
 from core.config import available_thinking_levels, load_config
 
@@ -94,14 +96,22 @@ def trace_callback(event: str, **kwargs):
 
 
 def _config_from_args(args) -> dict:
+    _load_dotenv_once()
     overrides: dict = {}
     if getattr(args, "model", None):
         overrides.setdefault("llm", {})["model"] = args.model
-    return load_config(
-        getattr(args, "config", None),
-        thinking=getattr(args, "thinking", "fast"),
-        cli_overrides=overrides or None,
-    )
+    try:
+        config = load_config(
+            getattr(args, "config", None),
+            thinking=getattr(args, "thinking", "fast"),
+            cli_overrides=overrides or None,
+        )
+        validate_deployment(config)
+    except (ValueError, OSError) as exc:
+        import sys
+        print(exc, file=sys.stderr)
+        raise SystemExit(2) from None
+    return config
 
 
 def _benchmark_indices_from_args(args) -> list[int] | None:
@@ -133,6 +143,12 @@ def _benchmark_indices_from_args(args) -> list[int] | None:
             f"cases from suite '{args.suite}' ({len(all_indices)} available)"
         )
     return selected
+
+
+def _cmd_check_config(args) -> int:
+    _config_from_args(args)
+    print("Deployment configuration valid (no services contacted).")
+    return 0
 
 
 def _cmd_run(args) -> int:
@@ -232,7 +248,8 @@ def _cmd_evaluate_benchmark(args) -> int:
 def _cmd_repl(args) -> int:
     from core.repl import RetroSynthesisREPL
 
-    repl = RetroSynthesisREPL(_config_from_args(args))
+    config = _config_from_args(args)
+    repl = RetroSynthesisREPL(config)
     repl.run()
     return 0
 
@@ -288,7 +305,7 @@ def _add_evaluate_args(parser: argparse.ArgumentParser, *, serial_retro190: bool
     skip_group.add_argument("--skip-existing", dest="skip_existing", action="store_true", default=True)
     skip_group.add_argument("--no-skip-existing", dest="skip_existing", action="store_false")
 
-    parser.add_argument("--hosts", default="host-c,host-e,host-f,host-g", help="Cluster hosts for distributed runs.")
+    parser.add_argument("--hosts", default="", help="Cluster hosts for distributed runs.")
     parser.add_argument("--max-workers", default="", help="Host caps, e.g. host-c=5,host-e=5.")
     parser.add_argument("--reserve-ram-gb", type=int, default=10)
     parser.add_argument("--reserve-gpu-mb", type=int, default=4000)
@@ -314,6 +331,10 @@ def _add_evaluate_args(parser: argparse.ArgumentParser, *, serial_retro190: bool
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Chemoenzymatic Retrosynthesis Agent")
     sub = parser.add_subparsers(dest="command", required=True)
+
+    check = sub.add_parser("check-config", help="Validate deployment settings offline.")
+    _add_config_args(check)
+    check.set_defaults(func=_cmd_check_config)
 
     run_p = sub.add_parser("run", help="Run the agent on one target SMILES.")
     run_p.add_argument("smiles", help="Target molecule SMILES.")

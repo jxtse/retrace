@@ -56,6 +56,8 @@ def _get_base_config() -> dict[str, Any]:
     global _BASE_CONFIG
     if _BASE_CONFIG is None:
         from core.config import load_config
+        from core.llm_client import _load_dotenv_once
+        _load_dotenv_once()
         _BASE_CONFIG = load_config(_DEFAULT_CONFIG_PATH, thinking=_DEFAULT_THINKING)
         logger.info(
             "loaded base config (thinking=%s, override=%s)",
@@ -98,15 +100,17 @@ async def create_run(req: RunRequest) -> RunCreated:
     sid = sessions.new_session_id()
     run = RunSession(session_id=sid, base_config=_get_base_config())
     run.bind_loop(asyncio.get_running_loop())
-    sessions.register(run)
 
     overrides = req.overrides.model_dump(exclude_none=True) if req.overrides else None
     try:
         run.start(req.smiles, req.model_family, req.preset, overrides)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
     except Exception as e:
         logger.exception("failed to start run")
         raise HTTPException(status_code=500, detail=f"start failed: {e}")
 
+    sessions.register(run)
     return RunCreated(session_id=sid, effective=run.effective_config)
 
 

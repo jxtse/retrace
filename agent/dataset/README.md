@@ -32,8 +32,8 @@ uv run python main.py evaluate jmc --local
 uv run python main.py evaluate hard-mol --local
 ```
 
-Without `--local` the command prints a distribution plan for a cluster run
-(`--hosts`, `--max-workers`); `--dry-run` prints it without launching anything.
+For distributed evaluation, supply `--hosts` and configure the deployment on each worker.
+The distributor may probe those hosts even with `--dry-run`. Use `main.py check-config` for offline validation.
 
 ## Where the inputs come from
 

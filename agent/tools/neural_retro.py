@@ -7,7 +7,7 @@ subprocess were removed 2026-06-08):
 
   - ``graph_retrosyn``         : GraphFP / DMPNNFP, USPTO templates (HTTP)
   - ``rxngraphormer``          : RxNGormer transformer, USPTO-Full (HTTP)
-  - ``template_relevance``     : Reaxys HTTP API on port 9410
+  - ``template_relevance``     : configured Reaxys HTTP API
   - ``chembart``               : ChemBART HTTP service
   - ``pistachio_ringbreaker``  : retroplanner HTTP API, ring-opening specialist
                                  (excluded from the default ensemble — call
@@ -212,11 +212,13 @@ class _RXNGraphormerHTTPEngine:
 
 
 class _TemplateRelevanceEngine:
-    """Reaxys template-relevance HTTP API (port 9410 by default)."""
+    """Reaxys template-relevance HTTP API at the configured URL."""
 
     def __init__(self, api_url: Optional[str], topk: int,
                  retries: int = 3, backoff_base: float = 1.0):
-        self._api_url = api_url or "http://localhost:9410/predictions/reaxys"
+        if not api_url:
+            raise ValueError("neural_retro.template_relevance_url is required")
+        self._api_url = api_url
         self._topk = topk
         self._retries = int(retries)
         self._backoff_base = float(backoff_base)
@@ -305,19 +307,7 @@ class _TemplateRelevanceEngine:
 class _ChemBartEngine:
     """ChemBART via the shared retroplanner ``/single_step`` endpoint.
 
-    Migrated 2026-05-29 off the previous standalone scraper. The old
-    implementation did ``GET /predict/reactant`` against a separate host
-    (``chembart.example.org``) and parsed Chinese HTML (``前体:.../置信度:...``)
-    after a cookie bootstrap. That deployment now rejects requests with
-    ``HTTP 400 {"detail":"无用户标识"}`` (the cookie path no longer yields
-    a user id), so the engine was silently dead.
-
-    host-d exposes the same ChemBART model through the standard
-    ``POST /retroplanner/api/single_step`` JSON contract
-    (``oneStepModel=["ChemBart (USPTO-Full)"]``), so ChemBART now rides
-    the shared `RetroplannerHTTPClient` like `_PistachioRingbreakerEngine`:
-    weighted host-d-primary / host-a-fallback routing, score normalisation,
-    retries and connection pooling all come for free.
+    Both dedicated and shared clients use the same JSON prediction contract.
 
     Parameters
     ----------
@@ -693,15 +683,15 @@ class NeuralRetroTool(Tool):
         engine_modes.setdefault("graph_retrosyn", "http_only")
         engine_modes.setdefault("pistachio_ringbreaker", "http_only")
 
-        # Build the shared HTTP client once.
-        http_client: Optional[RetroplannerHTTPClient] = None
-        if retroplanner_http_url:
-            http_client = RetroplannerHTTPClient(
-                url=retroplanner_http_url,
+        def client(url, weights=None):
+            return RetroplannerHTTPClient(
+                url=url,
                 timeout_s=retroplanner_http_timeout_s,
                 retries=retroplanner_http_retries,
-                weights=retroplanner_http_weights,
+                weights=weights,
             )
+
+        http_client = client(retroplanner_http_url, retroplanner_http_weights) if retroplanner_http_url else None
 
         # graph_retrosyn (HTTP-only)
         if "graph_retrosyn" in engines:
@@ -737,14 +727,10 @@ class NeuralRetroTool(Tool):
         if "chembart" in engines and (
             http_client is not None or chembart_url
         ):
-            # Migrated 2026-05-29 onto the shared single_step client
-            # (host-d-primary / host-a-fallback). `chembart_url` is only a
-            # fallback for building a standalone client when no shared
-            # `http_client` is injected.
             self._engines["chembart"] = _ChemBartEngine(
                 api_url=chembart_url,
                 topk=topk,
-                http_client=http_client,
+                http_client=client(chembart_url) if chembart_url else http_client,
             )
         if "pistachio_ringbreaker" in engines and (
             http_client is not None or pistachio_ringbreaker_url
@@ -761,7 +747,7 @@ class NeuralRetroTool(Tool):
             self._engines["pistachio_ringbreaker"] = _PistachioRingbreakerEngine(
                 api_url=pistachio_ringbreaker_url,
                 topk=topk,
-                http_client=http_client,
+                http_client=client(pistachio_ringbreaker_url) if pistachio_ringbreaker_url else http_client,
             )
 
     @property

@@ -14,8 +14,7 @@ Server contract (see docs/api_guide.md, reaction_rater)::
     -> {"results": {"reaction_is_feasible": bool, "confidence": float},
         "status": "success"}
 
-Only host-a (retro-fallback.example.org) currently serves this; host-d's same endpoint is
-``init failed``. The client is deliberately fail-soft at the TRANSPORT layer:
+The client is deliberately fail-soft at the TRANSPORT layer:
 ``rate()`` returns ``None`` on *any* terminal failure rather than raising, so
 the caller decides the policy. The feasibility pillar (``score_route``) treats
 a ``None`` as fatal and raises — there is no fallback scorer since the T5

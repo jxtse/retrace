@@ -11,6 +11,4 @@ configs/<file>.yaml`, or `AGENT_CONFIG=...` for the benchmark drivers).
 | `retro190_gpt56_thorough.yaml` | thorough search budget with `reasoning_effort: xhigh` |
 | `teacher_full_no_compact.yaml` | teacher-trajectory collection: postprocess and compaction off, full history preserved |
 
-Overlays are validated at startup; unknown keys are rejected. Endpoints in these
-files are placeholders — override them with the environment variables listed in
-`.env.example`.
+These files select experiment settings. Copy a preset before editing its deployment fields. The shared [deployment example](../../deployment.example.yaml) documents those fields. Run `uv run --locked python main.py check-config --config PATH` from the harness directory before planning.

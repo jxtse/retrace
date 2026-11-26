@@ -12,6 +12,4 @@ configs/<file>.yaml`).
 | `student_27b_vllm_lean.yaml` | same with the lean prompt and `fixed_output_budget: true` |
 | `test40_eval_config.yaml` | frozen evaluation config: temperature 0.7, 32,768-token output cap, 131,072 context, four shards of ten targets |
 
-Overlays are validated at startup, and the lean `agent` options are checked
-separately from the frozen services schema. Endpoints are placeholders — override
-them with the environment variables in `.env.example`.
+These files select experiment settings. Copy a preset before editing its deployment fields. The shared [deployment example](../../../deployment.example.yaml) documents those fields. Run `uv run --locked python main.py check-config --config PATH` from the harness directory before planning.

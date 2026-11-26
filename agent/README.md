@@ -9,18 +9,17 @@ experimental-validation cases).
 The harness is a client. It calls an OpenAI-compatible LLM endpoint, a
 retroplanner HTTP service (template-free single-step engines and the per-step
 reaction rater), optionally a remote forward-reaction model, and optionally
-vendor price APIs. None of those services ship here; the shipped config points
-at `*.example.org` placeholders. Live vendor pricing also needs a separate `ChemPriceClient` package that is not included; without it the cost pillar falls back to a built-in price heuristic (see the root README, "Vendor price lookup").
+vendor price APIs. Supply these services and any licensed data for your deployment.
 
 ## Run
 
+Follow the [deployment guide](../README.md#configure-a-deployment) to install the locked environment, copy the shared example and supply service URLs, credentials and data paths. From this harness directory:
+
 ```bash
-uv sync                                         # Python >= 3.11
-cp .env.example .env                            # credentials + endpoints
-uv run python main.py run "CC(=O)Oc1ccccc1C(=O)O"            # add --trace for a trace
-uv run python main.py run "<SMILES>" --thinking thorough --model <model>
-uv run python main.py evaluate retro190 --indices 0-4 --dry-run
-uv run python main.py repl
+export AGENT_CONFIG=deployment.local.yaml
+uv run --locked python main.py check-config
+# After configuring authorized services:
+uv run --locked python main.py run "CC(=O)Oc1ccccc1C(=O)O" --trace
 ```
 
 `evaluate` needs benchmark inputs; see `dataset/README.md`.

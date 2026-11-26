@@ -145,7 +145,7 @@ def preflight(config: Dict[str, Any]) -> Dict[str, Any]:
     # ReactionT5 HTTP server (optional; if not set, in-process fallback is used)
     forward = (config.get("verifier") or {}).get("forward") or {}
     t5_url = (forward.get("http_url") or "").rstrip("/")
-    if t5_url:
+    if t5_url and (config.get("verifier") or {}).get("enabled", True):
         info = http_get(t5_url + "/")
         if info and info.get("loaded"):
             report["reactiont5"] = {"url": t5_url, "ok": True, "device": info.get("device"),
@@ -156,7 +156,11 @@ def preflight(config: Dict[str, Any]) -> Dict[str, Any]:
         report["reactiont5"] = {"ok": True, "note": "in-process backend (no http_url)"}
 
     # ChemBart (best-effort)
-    chembart = (config.get("neural_retro") or {}).get("chembart_url", "")
+    from core.deployment import engine_url
+    neural = config.get("neural_retro") or {}
+    chembart = engine_url(neural, "chembart") if (
+        neural.get("enabled") and "chembart" in neural.get("engines", [])
+    ) else None
     if chembart:
         info = http_get(chembart.rstrip("/") + "/", timeout=10)
         report["chembart"] = {"url": chembart, "ok": bool(info), "note": "soft check"}
@@ -549,7 +553,12 @@ def main() -> int:
 
     # Resolve config for pre-flight + summary metadata.
     from core.config import load_config
-    config = load_config(args.config, thinking=args.thinking)
+    from core.deployment import validate_deployment
+    from core.llm_client import _load_dotenv_once
+    _load_dotenv_once()
+    overrides = {"llm": {"model": args.model}} if args.model else None
+    config = load_config(args.config, thinking=args.thinking, cli_overrides=overrides)
+    validate_deployment(config)
 
     run_id = args.run_id or datetime.now().strftime("%Y%m%d-%H%M%S")
     results_root = Path(args.results_root).expanduser().resolve() if args.results_root else RESULTS_ROOT

@@ -25,57 +25,57 @@ Each directory in the table has its own `README.md` with the details.
 
 The repository contains code only: no benchmark inputs, reference routes, run outputs or result tables. `dataset/` ships the benchmark drivers and says where to obtain the inputs; `LICENSES.md` lists what is deliberately not redistributed.
 
-## Installation
+## Configure a deployment
 
-Python ≥ 3.11. Each harness is a self-contained `uv` project:
-
-```bash
-cd agent
-uv sync                 # creates .venv from uv.lock
-cp .env.example .env    # fill in the endpoints you have
-```
-
-`agent-chemoenzymatic/` and `posttraining/eval_harness/` are separate projects with the same layout; `uv sync` in each. `posttraining/` recipes are shell/Python drivers that expect their own environment (ms-swift, TRL or vLLM on the training host) — see `posttraining/README.md`.
-
-## Configuration
-
-Credentials and service endpoints come from the environment (optionally a `.env` file next to the harness):
-
-| Variable | Needed for |
-|---|---|
-| `LLM_API_KEY` (+ optional `OPENROUTER_API_KEY` fallback) | Planning. The base URL and model live in the agent config (`configs/*.yaml` or `AGENT_CONFIG`). |
-| `RETROPLANNER_HTTP_URL` | Template-free single-step engines. Overrides the `*.example.org` placeholders in the shipped config. |
-| `CHEMBART_API_URL`, `RINGBREAKER_API_URL` | Per-engine overrides when the engines are deployed separately. |
-| `REACTION_RATER_URL` | `score_route`; the feasibility pillar refuses to construct without it. |
-| `RETRO_TEMPLATE_DATASET_DIR`, `USPTO_ROUTES_PKL`/`USPTO_ROUTES_HDF5` | Template library and precedent route memory, if you have those datasets. |
-| `MCULE_API_KEY`, `MOLPORT_API_KEY`, `CHEMSPACE_API_KEY` | Optional vendor price lookups for the cost pillar. These also require a separate price-lookup client that is not included in this repository (see below). |
-
-None of these services is part of the repository. Without them the package imports and the offline tests pass, but planning cannot run.
-
-**Vendor price lookup.** `tools/verifier/pricing.py` imports `backend.clients.chemprice_client.ChemPriceClient` from a separate verifier package located by `scoring.cost.chemprice.verifier_repo` in the agent config. That package is not released here. Without it, the vendor keys have no effect: the cost pillar logs `ChemPriceClient init failed` and uses the built-in molecular-weight/complexity price heuristic for every leaf. To use live vendor prices, provide a module exposing a `ChemPriceClient` with the same `status()` and lookup interface and point `verifier_repo` at it.
-
-## Usage
+Use Python 3.11 or later and uv. Each harness has its own lockfile. From a clean checkout:
 
 ```bash
-cd agent
-uv run python main.py run "CC(=O)Oc1ccccc1C(=O)O"            # one target
-uv run python main.py run "<SMILES>" --thinking thorough    # longer search budget
-uv run python main.py run "<SMILES>" --trace                # print the step trace
-uv run python main.py repl                                  # interactive
+git clone https://github.com/jxtse/retrace.git
+cd retrace/agent
+uv sync --locked
+cp ../deployment.example.yaml deployment.local.yaml
+export AGENT_CONFIG=deployment.local.yaml
 ```
 
-Python API:
+Edit the copy. Set `llm.base_url` to your authorized gateway's API base and `llm.model` to its served model ID. Supply full POST URLs for the selected single-step engines and the Reaction Rater. The built-in reviewer and feasibility judge request their own configured models at the coordinator endpoint unless you set their respective `base_url`. Use endpoint URLs without embedded credentials. Inject `LLM_API_KEY` from your secret manager if your gateway needs authentication. Alternatively, copy `.env.example` to `.env` in the harness working directory and fill it locally. Process environment values take precedence over that file.
 
-```python
-from core import build_agent
-from core.config import load_config
-
-agent = build_agent(load_config(thinking="fast"))
-result = agent.run("CC(=O)Oc1ccccc1C(=O)O")
-print(result["best_route"])
+```bash
+uv run --locked python main.py check-config --config deployment.local.yaml
 ```
 
-Benchmark drivers live in `dataset/benchmark/<suite>/run_benchmark.py` and read a `cases.csv` you supply; `main.py evaluate <suite>` dispatches to them.
+The unfilled example exits with status 2 and lists missing fields. The check validates configuration only. It does not open a service connection, load stock files, or establish model access.
+
+| Integration | What ships | What to supply |
+|---|---|---|
+| Coordinator, reviewer and judges | Client, prompts and experiment presets | Authorized model serving. The adapter and its required base model are listed below. |
+| GraphFP, RXNGraphormer, ChemBART and ring-breaker | Single-step HTTP clients | Compatible service deployment and its model assets. GraphFP and RXNGraphormer use the shared URL list. |
+| Reaxys template relevance | Optional HTTP client | Select `template_relevance` in `neural_retro.engines` and set `template_relevance_url` to an authorized service. Arrange access to its data separately. |
+| Feasibility | Reaction Rater client and scoring code | `verifier.feasibility.rater.http_url` (one URL or an ordered list) for the enabled verifier. |
+| Stock and cost | Buyability readers, local cost heuristic, SCScore and SA_Score | Your BioNav and ZINC stock CSVs with a SMILES column. Optional Enamine index, buyability database and legacy CSV directory are under `verifier.cost`. |
+| Live vendor prices | Pricing adapter | A compatible `backend.clients.chemprice_client.ChemPriceClient` package in `verifier.cost.chemprice.verifier_repo` and authorized MolPort or ChemSpace credentials (`MOLPORT_API_KEY`, `CHEMSPACE_API_KEY`). The shipped pricing adapter disables MCule. Without the client the cost pillar uses its local fallback. |
+| Templates and precedents | Template tools and precedent-index builder | Your compatible curated template library and, for recall, a prepared precedent database. `USPTO_ROUTES_PKL` / `USPTO_ROUTES_HDF5` select input to the index builder. |
+| Greenness | Scoring code | ASKCOS condition predictor package/weights and CHEM21 solvent classes where available. Missing inputs reduce scoring coverage. |
+| Benchmarks | Drivers and metric code | Target lists and reference materials obtained under the source terms. See [input layouts](agent/dataset/README.md) and [third-party notices](LICENSES.md). |
+
+**Resolution rules.** A relative YAML filename and relative stock or asset paths resolve from the selected harness directory. Absolute stock paths work directly. For older stock overlays only, an existing file under `vendor/legacy_retro_planner/` is used when the harness-relative file is absent.
+
+- `--config` selects the YAML, otherwise `AGENT_CONFIG` does. The loader merges built-in settings, the selected `--thinking` budget, the YAML and then `--model`. Benchmark workers accept `AGENT_MODEL`; the review UI applies its selected model-family preset.
+- For shared single-step clients the order is `RETROPLANNER_HTTP_URLS`, `RETROPLANNER_HTTP_URL`, YAML `retroplanner_http_urls`, then `retroplanner_http_url`. Environment lists accept commas or whitespace. YAML lists retain order and may specify parallel first-attempt weights. Environment overrides use equal first-attempt weights.
+- For ChemBART and ring-breaker, `CHEMBART_API_URL` and `RINGBREAKER_API_URL` override their dedicated YAML URLs. Each uses the shared service if its dedicated URL is unset. `REACTION_RATER_URL` overrides the rater configuration with a single URL. `RETRO_TEMPLATE_DATASET_DIR` overrides the template directory. An enabled precursor sanity judge honors `SANITY_JUDGE_BASE_URL`, `SANITY_JUDGE_MODEL` and `SANITY_JUDGE_EFFORT` before its YAML options.
+- `LLM_API_KEY` authenticates configured LLM clients. Without it, `OPENROUTER_API_KEY` and `OPENAI_API_KEY` apply only to their respective public HTTPS API origins. The optional Anthropic-protocol fallback is disabled by default. Enabling it selects OpenRouter unless you configure a different fallback URL. Use `OPENROUTER_API_KEY` for OpenRouter or `LLM_FALLBACK_API_KEY` for your custom fallback.
+- Disable a whole integration with `neural_retro.enabled: false` or `verifier.enabled: false` only when you intend to omit those tools. Use YAML booleans. For a study, copy the actual experiment preset and edit its deployment fields. Preserve its model IDs, tool set, thresholds, weights and budgets.
+
+## Capability smoke test
+
+After the check passes and the configured services and datasets are authorized and available, try the aspirin example from this harness:
+
+```bash
+uv run --locked python main.py run "CC(=O)Oc1ccccc1C(=O)O" --config deployment.local.yaml --trace
+```
+
+This single-target run exercises your deployment. Paper comparisons also depend on the exact preset, checkpoint, service versions, stocks, templates, scoring assets, benchmark inputs and evaluation protocol. Record any disabled tool or missing asset alongside results.
+
+The same YAML fields work in `agent-chemoenzymatic/` and `posttraining/eval_harness/`. Set `AGENT_CONFIG` for benchmark workers and the two review UIs. Distributed evaluation requires explicit `--hosts`; use `--local` for a local benchmark. The post-training collection, cluster launch and held-out evaluation scripts outside these harnesses encode experiment-specific provisioning and model choices. They require separate site configuration before use.
 
 ## Offline tests
 

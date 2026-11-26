@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 
 from core.substrate_client import (
-    SUBSTRATE_BASE_URL,
     SubstrateLLMClient,
     _substrate_model_id,
     make_llm_client,
@@ -34,10 +33,9 @@ def test_substrate_model_id(given, expected):
     assert _substrate_model_id(given) == expected
 
 
-def test_substrate_client_normalises_model_and_pins_base_url():
-    c = SubstrateLLMClient(model="claude-opus-4.8")
-    assert c.model == "claude-opus-4-8"
-    assert c.base_url == SUBSTRATE_BASE_URL.rstrip("/")
+def test_substrate_client_requires_endpoint():
+    with pytest.raises(ValueError, match="llm.base_url"):
+        SubstrateLLMClient(model="claude-opus-4.8")
 
 
 def test_substrate_client_explicit_base_url_kept():
@@ -69,7 +67,6 @@ def test_make_llm_client_uses_plain_client_off_substrate():
     assert c.model == "qwen3.6-35b-a3b"
 
 
-def test_make_llm_client_none_base_url_falls_back_to_default():
-    c = make_llm_client(base_url=None, model="gpt-5.5")
-    assert isinstance(c, LLMClient)
-    assert c.base_url  # not None, no crash on .rstrip()
+def test_make_llm_client_requires_endpoint():
+    with pytest.raises(ValueError, match="llm.base_url"):
+        make_llm_client(base_url=None, model="gpt-5.5")

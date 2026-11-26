@@ -104,8 +104,7 @@ def _is_responses_model(model: str) -> bool:
     return m.startswith(("gpt-5.5", "gpt-5-5", "gpt-5.6", "gpt-5-6"))
 
 
-# Try to load .env (best-effort, no hard dep). LLM_API_KEY / OPENROUTER_API_KEY /
-# OPENAI_API_KEY are all honored, in that order.
+# Exported settings take precedence over local dotenv entries.
 def _load_dotenv_once() -> None:
     if os.environ.get("_AGENT_DOTENV_LOADED"):
         return
@@ -127,25 +126,21 @@ def _load_dotenv_once() -> None:
     os.environ["_AGENT_DOTENV_LOADED"] = "1"
 
 
-def _api_key() -> str | None:
+def primary_api_key(base_url: str) -> str | None:
+    from urllib.parse import urlsplit
+
     _load_dotenv_once()
-    for name in ("LLM_API_KEY", "OPENROUTER_API_KEY", "OPENAI_API_KEY"):
-        v = os.environ.get(name)
-        if v:
-            return v
-    return None
+    origin = urlsplit(base_url)
+    key = os.getenv("LLM_API_KEY")
+    if origin.scheme == "https" and origin.netloc == "openrouter.ai":
+        key = key or os.getenv("OPENROUTER_API_KEY")
+    if origin.scheme == "https" and origin.netloc == "api.openai.com":
+        key = key or os.getenv("OPENAI_API_KEY")
+    return key
 
 
-def _apply_auth(session: "requests.Session") -> None:
-    """Attach Authorization: Bearer <key> if any standard env var is set.
-    Harmless when running against the local proxy (no key needed).
-
-    Also sets `x-api-key` and `anthropic-version` so the same session can
-    talk to `/v1/messages` (Anthropic protocol) without re-authing. The
-    4141 proxy accepts either Bearer or x-api-key on `/v1/messages`; some
-    upstream channels prefer x-api-key, so we send both.
-    """
-    key = _api_key()
+def _apply_auth(session: "requests.Session", base_url: str) -> None:
+    key = primary_api_key(base_url)
     session.headers.setdefault("anthropic-version", ANTHROPIC_VERSION)
     if not key:
         return
@@ -155,7 +150,7 @@ def _apply_auth(session: "requests.Session") -> None:
     session.headers.setdefault("X-Title", "retrosynthesis-agent")
 
 
-DEFAULT_BASE_URL = "http://localhost:4141/v1"
+DEFAULT_BASE_URL = None
 DEFAULT_MODEL = "claude-opus-4-8"
 
 
@@ -359,7 +354,7 @@ class LLMClient:
 
     def __init__(
         self,
-        base_url: str = DEFAULT_BASE_URL,
+        base_url: str | None = DEFAULT_BASE_URL,
         model: str = DEFAULT_MODEL,
         temperature: float = 0.2,
         max_tokens: int = 4096,
@@ -379,7 +374,7 @@ class LLMClient:
         retry_delay: float = 2.0,
         connect_timeout: float = 10.0,
         read_timeout: float = 300.0,
-        fallback_enabled: bool = True,
+        fallback_enabled: bool = False,
         fallback_base_url: str | None = "https://openrouter.ai/api/v1",
         fallback_model: str | None = "anthropic/claude-opus-4.7",
         reasoning_effort: str = "medium",
@@ -388,6 +383,8 @@ class LLMClient:
         wire_log_path: str | None = None,
         fixed_output_budget: bool = False,
     ):
+        if not base_url:
+            raise ValueError("llm.base_url is required")
         self.base_url = base_url.rstrip("/")
         # Actual-wire tap: when set, every /chat/completions POST body (the
         # exact JSON sent, after orphan-drop/shrink/budget edits) and its parsed
@@ -421,7 +418,7 @@ class LLMClient:
         self.last_reasoning: str | None = None
         self.responses_state = responses_state if responses_state in ("auto", "manual") else "auto"
         self.session = requests.Session()
-        _apply_auth(self.session)
+        _apply_auth(self.session, self.base_url)
         # OpenRouter fallback session, lazily constructed.
         # Activated only when the main Anthropic path raises after both
         # retry rounds (see chat / chat_with_override). Anthropic-only.
@@ -520,11 +517,16 @@ class LLMClient:
         if self._fallback_session is not None:
             return self._fallback_session
         _load_dotenv_once()
-        key = os.environ.get("OPENROUTER_API_KEY")
+        from urllib.parse import urlsplit
+        origin = urlsplit(self.fallback_base_url)
+        if origin.scheme == "https" and origin.netloc == "openrouter.ai":
+            key = os.getenv("OPENROUTER_API_KEY")
+        else:
+            key = os.getenv("LLM_FALLBACK_API_KEY")
         if not key:
             if not self._fallback_unavailable_logged:
                 logger.info(
-                    "Anthropic fallback disabled: OPENROUTER_API_KEY is unset"
+                    "Anthropic fallback disabled: no credential for the configured provider"
                 )
                 self._fallback_unavailable_logged = True
             return None
@@ -650,7 +652,7 @@ class LLMClient:
         """
         sess = self._get_fallback_session()
         if sess is None:
-            raise RuntimeError("anthropic fallback unavailable (no OPENROUTER_API_KEY)")
+            raise RuntimeError("anthropic fallback unavailable (missing provider credential)")
         payload = to_anthropic(req).model_dump(exclude_none=True)
         anth_msgs = payload.get("messages") or []
         cleaned, dropped_uses, dropped_results = (
@@ -720,7 +722,7 @@ class LLMClient:
         except Exception as exc:
             logger.debug("session.close() failed: %s", exc, exc_info=True)
         self.session = requests.Session()
-        _apply_auth(self.session)
+        _apply_auth(self.session, self.base_url)
 
     def _is_empty_choices_error(self, err: BaseException | None) -> bool:
         return isinstance(err, RuntimeError) and "empty choices" in str(err)

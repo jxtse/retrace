@@ -1,10 +1,7 @@
 # Retroplanner service API
 
 The harness is a client of a retroplanner HTTP service. This page documents the
-endpoints it calls, their request shapes and responses. The service itself is not
-part of this repository; the base URL in the shipped config is a placeholder
-(`http://retro-fallback.example.org:8001`), overridden by
-`RETROPLANNER_HTTP_URL`, `CHEMBART_API_URL` or `RINGBREAKER_API_URL`.
+endpoints it calls, their request shapes and responses. The service itself is external. Set the full POST URLs for your deployment in the YAML settings or environment.
 
 The service implements the model set of ChemEnzyRetroPlanner (Wang et al.,
 *Nat. Commun.* 16, 10929, 2025; MIT).

@@ -19,8 +19,7 @@ agent:
   tool_timeout_s: 900
   max_iterations: 30
 neural_retro:
-  # retroplanner is reached through an SSH tunnel; override the configured
-  # URL list with the RETROPLANNER_HTTP_URL environment variable.
+  # Supply the shared single-step URL for this deployment.
   retroplanner_http_timeout_s: 180
   retroplanner_http_retries: 3
   precursor_sanity_filter:
@@ -31,7 +30,7 @@ verifier:
       enabled: false      # same as qwen36_vllm: no external LLM judge
     rater:
       http_url:
-        - http://127.0.0.1:8001/retroplanner/api/reaction_rater   # same host-d host, via tunnel
+        - http://127.0.0.1:8001/retroplanner/api/reaction_rater
       timeout_s: 60.0
 compaction:
   max_tokens: 48000

@@ -1,0 +1,43 @@
+# Copy this file, then fill in the deployment you are authorized to use.
+# Paths are absolute or relative to the harness containing main.py.
+llm:
+  base_url: null
+  model: null
+  fallback:
+    enabled: false
+
+# Optional reviewer and feasibility judge inherit the coordinator URL.
+# Specify their base_url if you serve their configured models elsewhere.
+postprocess:
+  base_url: null
+
+neural_retro:
+  retroplanner_http_url: null       # Full single-step POST URL
+  retroplanner_http_urls: []        # Ordered alternatives, preferred over the single URL
+  retroplanner_http_weights: []     # First-attempt weights parallel to the URL list
+  chembart_url: null                # Full single-step URL for this engine only
+  pistachio_ringbreaker_url: null
+  template_relevance_url: null      # Required if engines includes template_relevance
+
+stocks:
+  BioNav-stock: assets/bionav.csv
+  Zinc_Fix-stock: assets/zinc.csv
+templates:
+  dataset_dir: null
+precedent_recall:
+  enabled: false
+  db_root: precedent-db
+verifier:
+  feasibility:
+    judge:
+      base_url: null
+    rater:
+      http_url: null                # Full POST URL or ordered YAML list of URLs
+  cost:
+    enamine_index: null
+    buyability_db: null
+    legacy_csvs: null
+    chemprice:
+      verifier_repo: null           # Compatible external vendor-pricing client
+  greenness:
+    condition_model_dir: tools/condition_predictor

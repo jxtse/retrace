@@ -5,7 +5,6 @@ Supports Server-Sent Events (SSE) streaming from OpenAI-compatible APIs.
 
 import json
 import logging
-import os
 from typing import Generator
 
 import requests
@@ -13,13 +12,11 @@ import requests
 logger = logging.getLogger(__name__)
 
 
-def _auth_headers() -> dict:
-    """Bearer auth from env (LLM_API_KEY > OPENROUTER_API_KEY > OPENAI_API_KEY)."""
-    for name in ("LLM_API_KEY", "OPENROUTER_API_KEY", "OPENAI_API_KEY"):
-        v = os.environ.get(name)
-        if v:
-            return {"Authorization": f"Bearer {v}"}
-    return {}
+def _auth_headers(base_url: str) -> dict:
+    from core.llm_client import primary_api_key
+
+    key = primary_api_key(base_url)
+    return {"Authorization": f"Bearer {key}"} if key else {}
 
 
 def stream_chat_completion(
@@ -60,7 +57,7 @@ def stream_chat_completion(
     url = f"{base_url.rstrip('/')}/chat/completions"
 
     try:
-        resp = requests.post(url, json=payload, headers=_auth_headers(),
+        resp = requests.post(url, json=payload, headers=_auth_headers(base_url),
                              stream=True, timeout=300)
         resp.raise_for_status()
     except requests.RequestException as e:

@@ -53,7 +53,7 @@ PER_WORKER_RAM_GB = 9
 PER_WORKER_GPU_MB = 4000
 BASE_RAM_GB = 7
 
-DEFAULT_CLUSTER_HOSTS = ("host-c", "host-e", "host-f", "host-g")
+DEFAULT_CLUSTER_HOSTS = ()
 DEFAULT_HARD_CAPS = {
     "host-c": 5,
     "host-e": 5,
@@ -397,9 +397,11 @@ def distribute_benchmark(
     suite = get_benchmark_suite(suite_name)
     selected_indices = default_indices_for_suite(suite.name) if indices is None else indices
     host_list = parse_hosts(hosts)
+    if not host_list:
+        raise ValueError("provide --hosts for distributed evaluation or use --local")
     hard_caps = parse_worker_caps(max_workers)
     out_dir = Path(output_dir).expanduser().resolve() if output_dir else default_output_dir(suite.name)
-    config = Path(config_path).expanduser().resolve() if config_path else None
+    config = (Path(REPO_ROOT) / Path(config_path).expanduser()).resolve() if config_path else None
 
     print(f"[evaluate] suite={suite.cli_name} indices={len(selected_indices)}", file=sys.stderr)
     print(f"[evaluate] output_dir={out_dir}", file=sys.stderr)
