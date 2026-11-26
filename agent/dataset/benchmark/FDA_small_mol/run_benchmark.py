@@ -145,16 +145,9 @@ def run_one(job: dict) -> dict:
     root.setLevel(_lg.INFO)
 
     from core import build_agent
-    from core.config import load_config
+    from core.config import load_benchmark_config
 
-    overrides = {}
-    if os.environ.get("AGENT_MODEL"):
-        overrides.setdefault("llm", {})["model"] = os.environ["AGENT_MODEL"]
-    config = load_config(
-        os.environ.get("AGENT_CONFIG"),
-        thinking=os.environ.get("AGENT_THINKING", "fast"),
-        cli_overrides=overrides or None,
-    )
+    config = load_benchmark_config()
 
     t0 = time.time()
     record = {
@@ -239,6 +232,12 @@ def main():
         help="parent dir for runs/transcripts/logs (default: bench dir itself)",
     )
     args = ap.parse_args()
+    from core.config import load_benchmark_config
+
+    try:
+        load_benchmark_config()
+    except ValueError as exc:
+        ap.error(str(exc))
 
     variants = [v.strip() for v in args.variants.split(",") if v.strip()]
     wanted = set()

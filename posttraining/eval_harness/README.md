@@ -22,18 +22,18 @@ What "lean" means here:
 
 ## Run
 
+Follow the [deployment guide](../../README.md#configure-a-deployment) to install the locked environment, copy the shared example and supply service URLs, credentials and data paths. From this harness directory:
+
 ```bash
-uv sync                                         # Python >= 3.11
-cp .env.example .env                            # credentials + endpoints
-uv run python main.py run "CC(=O)Oc1ccccc1C(=O)O"            # add --trace for a trace
-uv run python main.py run "<SMILES>" --config configs/student_27b_vllm_lean.yaml
-uv run python main.py evaluate retro190 --indices 0-4 --dry-run
+export AGENT_CONFIG=deployment.local.yaml
+uv run --locked python main.py check-config
+# After configuring authorized services:
+uv run --locked python main.py run "CC(=O)Oc1ccccc1C(=O)O" --trace
 ```
 
 The harness is a client: the LLM endpoint (the served student, or any
 OpenAI-compatible endpoint) and the retroplanner service are not part of this
-repository. `configs/` points at `127.0.0.1` ports, so a local vLLM and a service
-tunnel are expected; override with the environment variables in `.env.example`.
+repository. The student and test40 presets select explicit local deployments.
 
 ## Layout
 

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 
 _STRICT = ConfigDict(extra="forbid")
@@ -31,15 +31,15 @@ class LLMFallbackConfig(BaseModel):
     # agent_factory (see "chore: disable LLM fallback by default"). An
     # override that supplies an `llm:` block but omits `fallback` must not
     # silently re-enable it.
-    enabled: bool = False
-    base_url: str = "https://openrouter.ai/api/v1"
+    enabled: StrictBool = False
+    base_url: str | None = "https://openrouter.ai/api/v1"
     model: str = "anthropic/claude-opus-4.7"
 
 
 class LLMConfig(BaseModel):
     model_config = _STRICT
-    base_url: str = "http://localhost:4141/v1"
-    model: str = "claude-opus-4.7"
+    base_url: str | None = None
+    model: str | None = None
     temperature: float = 0.2
     max_tokens: int = 4096
     max_retries: int = 6
@@ -98,8 +98,8 @@ class PromptsConfig(BaseModel):
 
 class PostprocessConfig(BaseModel):
     model_config = _STRICT
-    enabled: bool = True
-    base_url: str = "http://localhost:4141/v1"
+    enabled: StrictBool = True
+    base_url: str | None = None
     model: str = "claude-opus-4-8"
     temperature: float = 0.0
     max_tokens: int = 32000
@@ -131,7 +131,7 @@ class SuggestTemplatesConfig(BaseModel):
 
 class EnzymaticRetroConfig(BaseModel):
     model_config = _STRICT
-    enabled: bool = True
+    enabled: StrictBool = True
 
 
 # ─── neural_retro: ──────────────────────────────────────────────────
@@ -139,7 +139,7 @@ class EnzymaticRetroConfig(BaseModel):
 
 class NeuralRetroConfig(BaseModel):
     model_config = _STRICT
-    enabled: bool = True
+    enabled: StrictBool = True
     topk: int = 10
     per_engine_topk: int = 50
     per_engine_caps: dict[str, int] = Field(default_factory=dict)

@@ -21,6 +21,8 @@ from pathlib import Path
 from rdkit import Chem
 
 from core.agent_factory import build_agent
+from core.config import load_config
+from core.llm_client import _load_dotenv_once
 from core.route_text import parse_route_from_text
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -53,7 +55,7 @@ PER_WORKER_RAM_GB = 9
 PER_WORKER_GPU_MB = 4000
 BASE_RAM_GB = 7
 
-DEFAULT_CLUSTER_HOSTS = ("host-c", "host-e", "host-f", "host-g")
+DEFAULT_CLUSTER_HOSTS = ()
 DEFAULT_HARD_CAPS = {
     "host-c": 5,
     "host-e": 5,
@@ -328,10 +330,12 @@ def build_distributed_launch_cmd(
         "export LLM_API_KEY && "
         f"nohup {run_cmd} > {log_path} 2>&1 < /dev/null &"
     )
-    return (
-        "ssh -n -f -o BatchMode=yes -o ConnectTimeout=15 "
-        f"{shlex.quote(host)} bash -lc {shlex.quote(inner)}"
-    )
+    # The remote login shell parses this argument before bash receives the script.
+    remote_command = shlex.join(["bash", "-lc", inner])
+    return shlex.join([
+        "ssh", "-n", "-f", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
+        "--", host, remote_command,
+    ])
 
 
 def run_local_benchmark(
@@ -397,9 +401,22 @@ def distribute_benchmark(
     suite = get_benchmark_suite(suite_name)
     selected_indices = default_indices_for_suite(suite.name) if indices is None else indices
     host_list = parse_hosts(hosts)
+    if not host_list:
+        raise ValueError("provide --hosts for distributed evaluation or use --local")
     hard_caps = parse_worker_caps(max_workers)
     out_dir = Path(output_dir).expanduser().resolve() if output_dir else default_output_dir(suite.name)
-    config = Path(config_path).expanduser().resolve() if config_path else None
+    _load_dotenv_once()
+    selected = config_path or os.getenv("AGENT_CONFIG")
+    config = (REPO_ROOT / Path(selected).expanduser()).resolve() if selected else None
+    effective_model = model or os.getenv("AGENT_MODEL")
+    if config is not None:
+        loaded_config = load_config(
+            config, thinking=thinking,
+            cli_overrides={"llm": {"model": effective_model}} if effective_model else None,
+        )
+        effective_model = loaded_config["llm_model"]
+        if not (effective_model or "").strip():
+            raise ValueError("llm.model requires a served model ID")
 
     print(f"[evaluate] suite={suite.cli_name} indices={len(selected_indices)}", file=sys.stderr)
     print(f"[evaluate] output_dir={out_dir}", file=sys.stderr)
@@ -455,7 +472,7 @@ def distribute_benchmark(
             output_dir=out_dir,
             thinking=thinking,
             config_path=config,
-            model=model,
+            model=effective_model,
             variants=variants or suite.default_variants,
             skip_existing=skip_existing,
         )
@@ -464,7 +481,7 @@ def distribute_benchmark(
             "workers": len(idxs),
             "thinking": thinking,
             "config_override": str(config) if config else "",
-            "model": model or "",
+            "model": effective_model or "",
             "variants": variants or suite.default_variants or "",
         }
         commands.append({"host": host, "cmd": cmd})
@@ -474,7 +491,7 @@ def distribute_benchmark(
         "output_dir": str(out_dir),
         "thinking": thinking,
         "config_override": str(config) if config else "",
-        "model": model or "",
+        "model": effective_model or "",
         "total_indices": len(selected_indices),
         "total_workers": total_workers,
         "unassigned": unassigned,
@@ -505,8 +522,7 @@ def distribute_benchmark(
         host = entry["host"]
         print(f"[evaluate] launching {host}", file=sys.stderr)
         result = subprocess.run(
-            entry["cmd"],
-            shell=True,
+            shlex.split(entry["cmd"]),
             capture_output=True,
             text=True,
             timeout=launch_timeout_s,

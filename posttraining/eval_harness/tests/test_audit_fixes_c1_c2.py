@@ -46,6 +46,8 @@ def patched_verifier_externals(monkeypatch):
         def predict_top1(self, *a, **k):  # pragma: no cover - not exercised here
             return {"temperature": 25.0, "solvent": "", "reagent": "", "score": 0.0}
 
+    monkeypatch.setenv("REACTION_RATER_URL", "https://rater.invalid")
+    monkeypatch.setenv("RETROPLANNER_HTTP_URL", "https://planner.invalid")
     monkeypatch.setattr(sr, "ConditionPredictor", _StubConditionPredictor)
     return monkeypatch
 
@@ -57,7 +59,7 @@ def _build_agent_with_judge_pin(main_model: str, judge_model: str,
     from core.config import load_config
     from core.agent_factory import build_agent
 
-    cfg = load_config(thinking="standard")
+    cfg = load_config(thinking="standard", cli_overrides={"llm": {"base_url": "https://main.invalid"}})
     cfg["llm_model"] = main_model
     # Pin the feasibility judge distinct from the main model.
     cfg.setdefault("verifier", {}).setdefault("feasibility", {})["judge"] = {
@@ -99,7 +101,7 @@ def test_feasibility_judge_reuses_main_when_not_pinned_distinct(patched_verifier
     from core.config import load_config
     from core.agent_factory import build_agent
 
-    cfg = load_config(thinking="standard")
+    cfg = load_config(thinking="standard", cli_overrides={"llm": {"base_url": "https://main.invalid"}})
     cfg["llm_model"] = "gpt-5.5"
     # Judge pinned to the SAME endpoint+model as main → reuse.
     base = cfg.get("llm_base_url")

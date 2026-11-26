@@ -40,7 +40,7 @@ def test_run_one_persists_postprocess_artifacts(monkeypatch, tmp_path):
             }
 
     monkeypatch.setattr("core.build_agent", lambda config: FakeAgent())
-    monkeypatch.setattr("core.config.load_config", lambda *args, **kwargs: {})
+    monkeypatch.setattr("core.config.load_benchmark_config", lambda *args, **kwargs: {})
     monkeypatch.setattr(bench, "MEM_SKIP_GB", 999999)
 
     result = bench.run_one(

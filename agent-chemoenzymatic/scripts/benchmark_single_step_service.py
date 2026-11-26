@@ -11,12 +11,12 @@ Examples
 Inspect the low-load default plan (does not send HTTP requests)::
 
     python3 scripts/benchmark_single_step_service.py \
-      --url http://retro-primary.example.org:8001/retroplanner/
+      --url "$RETROPLANNER_SERVICE_URL"
 
 Run two requests against one model, capped at one request/second::
 
     python3 scripts/benchmark_single_step_service.py \
-      --url http://retro-primary.example.org:8001/retroplanner/ \
+      --url "$RETROPLANNER_SERVICE_URL" \
       --model "ChemBart (USPTO-Full)" --execute
 
 Measure same-model and four-model fan-out.  Here ``--concurrency 4`` means
@@ -24,7 +24,7 @@ four in-flight requests for a same-model scenario and 4 models x 4 requests
 = 16 in-flight requests for a four-model scenario::
 
     python3 scripts/benchmark_single_step_service.py \
-      --url http://retro-primary.example.org:8001/retroplanner/ \
+      --url "$RETROPLANNER_SERVICE_URL" \
       --model "ChemBart (USPTO-Full)" \
       --model "DMPNNFP (USPTO-Full)" \
       --model "RxNGormer (USPTO-Full)" \

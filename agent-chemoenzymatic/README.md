@@ -20,18 +20,17 @@ What the extension adds on top of `agent/`:
   mixed route keeps an auditable trail.
 
 The harness is a client: it calls an OpenAI-compatible LLM endpoint and a
-retroplanner HTTP service. Neither ships here; the shipped config points at
-`*.example.org` placeholders.
+retroplanner HTTP service. Supply both services for your deployment.
 
 ## Run
 
+Follow the [deployment guide](../README.md#configure-a-deployment) to install the locked environment, copy the shared example and supply service URLs, credentials and data paths. From this harness directory:
+
 ```bash
-uv sync                                         # Python >= 3.11
-cp .env.example .env                            # credentials + endpoints
-uv run python main.py run "CC(=O)Oc1ccccc1C(=O)O"            # add --trace for a trace
-uv run python main.py run "<SMILES>" --thinking thorough --model <model>
-uv run python main.py evaluate retro190 --indices 0-4 --dry-run
-uv run python main.py repl
+export AGENT_CONFIG=deployment.local.yaml
+uv run --locked python main.py check-config
+# After configuring authorized services:
+uv run --locked python main.py run "CC(=O)Oc1ccccc1C(=O)O" --trace
 ```
 
 The enzymatic library needs a local template set (`RETRO_TEMPLATE_DATASET_DIR`);

@@ -14,6 +14,8 @@ from core.substrate_client import make_llm_client
 from core.prompt_loader import PromptLoader
 from services.autocompact import CompactionConfig
 from services.result_store import ResultStore
+from core.deployment import engine_url, retroplanner_urls, shared_engines, stock_path, validate_deployment
+from core.llm_client import _load_dotenv_once
 from tools.base import ToolRegistry
 
 logger = logging.getLogger(__name__)
@@ -28,26 +30,6 @@ def _prompt_artifact(path: str) -> dict:
         "sha256": hashlib.sha256(data).hexdigest(),
         "bytes": len(data),
     }
-
-
-def _split_url_list(raw: str | None) -> list[str]:
-    if not raw:
-        return []
-    return [part.strip() for part in raw.replace(",", " ").split() if part.strip()]
-
-
-def _retroplanner_urls(neural_cfg: dict) -> str | list[str] | None:
-    env_urls = _split_url_list(os.environ.get("RETROPLANNER_HTTP_URLS"))
-    if env_urls:
-        return env_urls
-    env_url = os.environ.get("RETROPLANNER_HTTP_URL")
-    if env_url:
-        env_url_parts = _split_url_list(env_url)
-        return env_url_parts if len(env_url_parts) > 1 else env_url
-    cfg_urls = neural_cfg.get("retroplanner_http_urls") or []
-    if cfg_urls:
-        return cfg_urls
-    return neural_cfg.get("retroplanner_http_url")
 
 
 def _retroplanner_weights(neural_cfg: dict) -> list[int] | None:
@@ -74,36 +56,7 @@ def _retroplanner_weights(neural_cfg: dict) -> list[int] | None:
 
 
 def _build_sanity_judge_client(neural_cfg: dict, main_llm: LLMClient) -> LLMClient:
-    """Dedicated LLM client for the precursor sanity judge (tools/neural_retro.py).
-
-    The judge is a trivial fail-open yes/no on whether a candidate precursor
-    set is obviously broken. It fans out ~6 concurrent threads per neural_retro
-    turn, and under a large multi-worker run every worker reaches the model
-    through the SAME shared SSH tunnel (localhost:4141). If the judge inherits
-    the main client's retry budget (max_retries=10, 120s cap) a single
-    transient tunnel reset becomes a self-sustaining thundering herd:
-    ~6 threads x 10 retries = ~60 concurrent attempts saturate the tunnel so
-    none complete, every episode hits 10/10, and ~600s of backoff per call
-    fails open anyway (observed JMC case006: 50/51 episodes exhausted, 0
-    verdicts, dominant per-case wall cost — see the sanity-judge-retry-herd
-    memory).
-
-    Unlike the earlier conditional version, this ALWAYS returns a dedicated
-    client so the hard retry cap + cheap reasoning tier apply unconditionally —
-    crucially, even when the main agent model is already gpt-5.5 on the shared
-    tunnel (the large-scale setup), where reusing main_llm would reintroduce
-    the herd. The endpoint defaults to the main client's base_url/model so no
-    extra config is needed; a ``precursor_sanity_filter.judge_llm`` block (or
-    SANITY_JUDGE_* env) can point it elsewhere / pin a faster model.
-
-        neural_retro:
-          precursor_sanity_filter:
-            judge_llm:
-              base_url: http://localhost:4141/v1   # default: main client's
-              model: gpt-5.5                        # default: main client's
-              reasoning_effort: low                 # default: low (fast tier)
-              max_retries: 2
-    """
+    """Build the optional sanity judge with its configured timeout and retry cap."""
     sanity_cfg = neural_cfg.get("precursor_sanity_filter", {}) or {}
     judge_cfg = sanity_cfg.get("judge_llm", {}) or {}
     base_url = os.environ.get("SANITY_JUDGE_BASE_URL") or judge_cfg.get("base_url")
@@ -142,9 +95,12 @@ def _build_sanity_judge_client(neural_cfg: dict, main_llm: LLMClient) -> LLMClie
 
 def build_agent(config: dict | None = None) -> RetrosynthesisAgent:
     """Build a RetrosynthesisAgent from config."""
+    _load_dotenv_once()
     if config is None:
         from core.config import load_config
         config = load_config()
+
+    validate_deployment(config)
 
     # LLM
     llm_cfg = config.get("llm", {}) if isinstance(config.get("llm"), dict) else {}
@@ -152,8 +108,8 @@ def build_agent(config: dict | None = None) -> RetrosynthesisAgent:
         llm_cfg.get("fallback", {}) if isinstance(llm_cfg.get("fallback"), dict) else {}
     )
     llm = make_llm_client(
-        base_url=config.get("llm_base_url", llm_cfg.get("base_url", "http://localhost:4141/v1")),
-        model=config.get("llm_model", llm_cfg.get("model", "gpt-5.5")),
+        base_url=config.get("llm_base_url", llm_cfg.get("base_url")),
+        model=config.get("llm_model", llm_cfg.get("model")),
         temperature=config.get("temperature", llm_cfg.get("temperature", 0.2)),
         max_tokens=config.get("max_tokens", llm_cfg.get("max_tokens", 300000)),
         max_retries=int(config.get("llm_max_retries", llm_cfg.get("max_retries", 6))),
@@ -256,7 +212,7 @@ def build_agent(config: dict | None = None) -> RetrosynthesisAgent:
     # ── Template library: propagate configured dataset_dir ──
     base_dir = config.get("base_dir", REPO_ROOT)
     templates_cfg = config.get("templates", {}) or {}
-    dataset_dir = templates_cfg.get("dataset_dir")
+    dataset_dir = os.getenv("RETRO_TEMPLATE_DATASET_DIR") or templates_cfg.get("dataset_dir")
     if dataset_dir:
         abs_dir = dataset_dir if os.path.isabs(dataset_dir) else os.path.join(base_dir, dataset_dir)
         try:
@@ -277,17 +233,13 @@ def build_agent(config: dict | None = None) -> RetrosynthesisAgent:
     register_all_builtins(registry, config=config, precedent_db=precedent_db)
 
     # ── Tier 3: External tools (buyability — still direct tools) ──
-    # Vendored building-block CSVs live under vendor/legacy_retro_planner/
-    # (used to live in ../retro_planner/, now moved out to ../baselines/).
-    vendor_legacy_dir = os.path.join(base_dir, "vendor", "legacy_retro_planner")
-
     # Check buyability — stays as a direct tool (frequent atomic calls)
     stock_files = {}
     stocks_config = config.get("stocks", {
         "BioNav-stock": "building_block_dataset/bionav_all_building_block.csv",
     })
     for name, rel_path in stocks_config.items():
-        full_path = os.path.join(vendor_legacy_dir, rel_path)
+        full_path = str(stock_path(base_dir, rel_path))
         if os.path.exists(full_path):
             stock_files[name] = full_path
         else:
@@ -374,7 +326,7 @@ def build_agent(config: dict | None = None) -> RetrosynthesisAgent:
             (judge_config.base_url or "") != (llm.base_url or "")
             or (judge_config.model or "") != (llm.model or "")
         )
-        if judge_wants_distinct:
+        if judge_config.enabled and judge_wants_distinct:
             verifier_judge_client = make_llm_client(
                 base_url=judge_config.base_url or llm.base_url,
                 model=judge_config.model or llm.model,
@@ -412,7 +364,7 @@ def build_agent(config: dict | None = None) -> RetrosynthesisAgent:
             condition_model_dir=_abs(green_cfg.get("condition_model_dir")),
             carbon_fabrication_penalty=float(verifier_cfg.get("carbon_fabrication_penalty", 0.2)),
             feasibility_dispersion_lambda=float(verifier_cfg.get("feasibility_dispersion_lambda", 0.3)),
-            chemprice_enabled=bool((cost_cfg.get("chemprice") or {}).get("enabled", True)),
+            chemprice_enabled=(cost_cfg.get("chemprice") or {}).get("enabled", True),
             chemprice_env_file=_abs((cost_cfg.get("chemprice") or {}).get("env_file")),
             chemprice_verifier_repo=_abs((cost_cfg.get("chemprice") or {}).get("verifier_repo")),
             chemprice_timeout_s=float((cost_cfg.get("chemprice") or {}).get("timeout_s", 30.0)),
@@ -469,11 +421,8 @@ def build_agent(config: dict | None = None) -> RetrosynthesisAgent:
             from tools.neural_retro import NeuralRetroTool
             registry.register(NeuralRetroTool(
                 template_relevance_url=neural_cfg.get("template_relevance_url"),
-                chembart_url=os.environ.get("CHEMBART_API_URL") or neural_cfg.get("chembart_url"),  # env > config; no hardcoded fallback (engine self-disables if missing)
-                pistachio_ringbreaker_url=(
-                    os.environ.get("RINGBREAKER_API_URL")
-                    or neural_cfg.get("pistachio_ringbreaker_url")
-                ),  # env > config; no hardcoded fallback (engine self-disables if missing)
+                chembart_url=engine_url(neural_cfg, "chembart"),
+                pistachio_ringbreaker_url=engine_url(neural_cfg, "pistachio_ringbreaker"),
                 topk=neural_cfg.get("topk", 10),
                 per_engine_topk=neural_cfg.get("per_engine_topk", 50),
                 per_engine_caps=neural_cfg.get("per_engine_caps") or {},
@@ -485,17 +434,14 @@ def build_agent(config: dict | None = None) -> RetrosynthesisAgent:
                     "engines",
                     ["graph_retrosyn", "rxngraphormer", "chembart", "pistachio_ringbreaker"],
                 ),
-                # Dedicated capped+cheap client — NOT the main `llm`. The
-                # judge fails open + fans out concurrently over the shared
-                # tunnel; reusing main_llm reintroduces the retry herd. See
-                # _build_sanity_judge_client.
-                llm_client=_build_sanity_judge_client(neural_cfg, llm),
+                llm_client=(_build_sanity_judge_client(neural_cfg, llm)
+                            if neural_cfg.get("precursor_sanity_filter", {}).get("enabled", True) else None),
                 sanity_enabled=neural_cfg.get("precursor_sanity_filter", {}).get("enabled", True),
                 sanity_batch_size=neural_cfg.get("precursor_sanity_filter", {}).get("batch_size", 20),
                 sanity_max_dropped_logged=neural_cfg.get("precursor_sanity_filter", {}).get("max_dropped_logged", 10),
                 sanity_max_calls_per_run=neural_cfg.get("precursor_sanity_filter", {}).get("max_calls_per_run", 100),
                 # Shared retroplanner HTTP endpoint + per-engine routing.
-                retroplanner_http_url=_retroplanner_urls(neural_cfg),
+                retroplanner_http_url=retroplanner_urls(neural_cfg) if shared_engines(neural_cfg) else None,
                 retroplanner_http_weights=_retroplanner_weights(neural_cfg),
                 retroplanner_http_timeout_s=neural_cfg.get(
                     "retroplanner_http_timeout_s", 120,

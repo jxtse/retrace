@@ -57,7 +57,7 @@ class RetroSynthesisREPL:
 {BOLD}  Chemoenzymatic Retrosynthesis Agent{RESET}
 {BOLD}{CYAN}========================================{RESET}
 {DIM}ReACT-style agent for multi-step retrosynthesis planning{RESET}
-{DIM}LLM: {self.config.get('llm_model', 'claude-opus-4.6')} @ {self.config.get('llm_base_url', 'localhost:3000')}{RESET}
+{DIM}LLM: {self.config.get('llm_model')} @ {self.config.get('llm_base_url')}{RESET}
 
 {BOLD}Commands:{RESET}
   {GREEN}/run <SMILES>{RESET}     - Find retrosynthetic route for a molecule

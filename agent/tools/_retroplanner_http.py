@@ -105,8 +105,7 @@ class RetroplannerHTTPClient:
     Parameters
     ----------
     url
-        Full POST URL or list of POST URLs (e.g.
-        ``http://retro-primary.example.org:8001/retroplanner/api/single_step``).
+        Full POST URL or ordered list of POST URLs.
         When multiple URLs are supplied, first attempts are spread by a
         thread-safe weighted round-robin (see ``weights``) and transient
         retries advance to the next endpoint in the list.
@@ -114,7 +113,7 @@ class RetroplannerHTTPClient:
         Optional per-URL integer weights, parallel to ``url``. A host
         with weight N receives ~N× the first-hop share of a host with
         weight 1, so ``[8, 1]`` sends ~8/9 of first attempts to the
-        primary (host-d) and ~1/9 to the fallback (host-a) — host-a keeps
+        first endpoint and ~1/9 to the second endpoint, which keeps
         sharing load under high concurrency rather than sitting idle.
         Selection uses smooth weighted round-robin (Nginx SWRR), so the
         stream is interleaved rather than bursty. Defaults to equal

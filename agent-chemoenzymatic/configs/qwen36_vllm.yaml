@@ -3,8 +3,7 @@
 # the on-policy rollout collection behind the post-training recipes.
 # Usage: AGENT_CONFIG=configs/qwen36_vllm.yaml ... run_benchmark.py
 llm:
-  # The served node is usually reached through an SSH tunnel; point base_url at
-  # whatever the tunnel exposes locally.
+  # Explicit local vLLM deployment.
   base_url: http://localhost:8000/v1
   model: qwen3.6-35b-a3b
   temperature: 0.2
@@ -58,7 +57,7 @@ neural_retro:
     # run. base_url/model can also be overridden at launch via
     # SANITY_JUDGE_BASE_URL / SANITY_JUDGE_MODEL.
     judge_llm:
-      base_url: http://localhost:4141/v1
+      base_url: null
       model: gpt-5.5
       reasoning_effort: low
 
@@ -72,7 +71,7 @@ verifier:
       # rollout collection (it removes a per-low-step call without changing
       # scores); set enabled: true for a judge-pinned evaluation pass.
       enabled: false
-      base_url: http://localhost:4141/v1
+      base_url: null
       model: claude-opus-4-8
 
 compaction:

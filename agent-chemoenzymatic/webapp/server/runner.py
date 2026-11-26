@@ -109,6 +109,11 @@ class RunSession:
                 elif k == "stop_after_distinct_routes":
                     config.setdefault("agent", {})["stop_after_distinct_routes"] = int(v)
 
+        from core.deployment import validate_deployment
+        from core.llm_client import _load_dotenv_once
+
+        _load_dotenv_once()
+        validate_deployment(config)
         self.effective_config = {
             "llm_model": config.get("llm_model"),
             "llm_reasoning_effort": config.get("llm_reasoning_effort"),

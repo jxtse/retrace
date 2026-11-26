@@ -26,14 +26,16 @@ the tree stays portable). When an input file is missing the driver stops with a
 `main.py evaluate <suite>` dispatches to these drivers:
 
 ```bash
-uv run python main.py evaluate retro190 --indices 0-4 --local
+uv run python main.py evaluate retro190 --indices 0-4 --local --thinking standard --config configs/retro190_gpt56_standard.local.yaml
 uv run python main.py evaluate fda --indices 0-4 --local --variants stereo,canonical
 uv run python main.py evaluate jmc --local
 uv run python main.py evaluate hard-mol --local
 ```
 
-Without `--local` the command prints a distribution plan for a cluster run
-(`--hosts`, `--max-workers`); `--dry-run` prints it without launching anything.
+For the Retro-190 example, copy `configs/retro190_gpt56_standard.yaml` to `configs/retro190_gpt56_standard.local.yaml` and fill in its deployment settings. For fast or thorough, change both `--thinking` and the overlay to the [matching preset](../configs/README.md).
+
+For distributed evaluation, supply `--hosts`. The YAML selected by `--config` or `AGENT_CONFIG` must be readable at the same absolute path on every worker.
+The distributor may probe those hosts even with `--dry-run`. Use `main.py check-config` for offline validation.
 
 ## Where the inputs come from
 

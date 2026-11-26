@@ -63,10 +63,7 @@ _CACHE_DIR = os.path.join(
 _DEFAULT_CANDIDATES = (
     # 1. explicit env var wins
     os.environ.get("RETRO_TEMPLATE_DATASET_DIR", ""),
-    # 2. sibling checkout of the verifier repo (our primary intent)
-    "../chemoenzymatic-retrosynthesis-verifier/dataset",
-    "../../chemoenzymatic-retrosynthesis-verifier/dataset",
-    # 3. in-repo copy (if the user ever vendors the templates)
+    # in-repo copy (if the user ever vendors the templates)
     "dataset",
 )
 
