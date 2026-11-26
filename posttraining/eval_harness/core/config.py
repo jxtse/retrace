@@ -11,6 +11,7 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from core.deployment import validate_chemprice
 from services.config_schema import ConfigValidationError, validate_config
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -324,6 +325,8 @@ def load_config(
         _deep_merge(config, cli_overrides)
 
     _validate_runtime_config(config, strict=strict)
+    if isinstance(config.get("verifier"), dict):
+        validate_chemprice(config["verifier"])
     projected = _project_for_runtime(config)
     projected["thinking"] = thinking
     return projected

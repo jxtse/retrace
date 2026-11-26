@@ -21,6 +21,9 @@ from pathlib import Path
 from rdkit import Chem
 
 from core.agent_factory import build_agent
+from core.config import load_config
+from core.deployment import validate_deployment
+from core.llm_client import _load_dotenv_once
 from core.route_text import parse_route_from_text
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -401,7 +404,15 @@ def distribute_benchmark(
         raise ValueError("provide --hosts for distributed evaluation or use --local")
     hard_caps = parse_worker_caps(max_workers)
     out_dir = Path(output_dir).expanduser().resolve() if output_dir else default_output_dir(suite.name)
-    config = (Path(REPO_ROOT) / Path(config_path).expanduser()).resolve() if config_path else None
+    _load_dotenv_once()
+    selected = config_path or os.getenv("AGENT_CONFIG")
+    config = (REPO_ROOT / Path(selected).expanduser()).resolve() if selected else None
+    effective_model = model or os.getenv("AGENT_MODEL")
+    if config is not None:
+        validate_deployment(load_config(
+            config, thinking=thinking,
+            cli_overrides={"llm": {"model": effective_model}} if effective_model else None,
+        ))
 
     print(f"[evaluate] suite={suite.cli_name} indices={len(selected_indices)}", file=sys.stderr)
     print(f"[evaluate] output_dir={out_dir}", file=sys.stderr)
@@ -457,7 +468,7 @@ def distribute_benchmark(
             output_dir=out_dir,
             thinking=thinking,
             config_path=config,
-            model=model,
+            model=effective_model,
             variants=variants or suite.default_variants,
             skip_existing=skip_existing,
         )

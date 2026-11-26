@@ -9,6 +9,8 @@ from typing import Generator
 
 import requests
 
+from services.llm_http import LLMHTTPSession
+
 logger = logging.getLogger(__name__)
 
 
@@ -57,8 +59,9 @@ def stream_chat_completion(
     url = f"{base_url.rstrip('/')}/chat/completions"
 
     try:
-        resp = requests.post(url, json=payload, headers=_auth_headers(base_url),
-                             stream=True, timeout=300)
+        with LLMHTTPSession() as session:
+            resp = session.post(url, json=payload, headers=_auth_headers(base_url),
+                                stream=True, timeout=300)
         resp.raise_for_status()
     except requests.RequestException as e:
         logger.error("Stream request failed: %s", e)

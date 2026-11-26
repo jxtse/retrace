@@ -69,6 +69,16 @@ def _enabled(block, path, default):
     return enabled
 
 
+def validate_chemprice(verifier):
+    if verifier.get("cost") is None:
+        return
+    cost = _block(verifier, "cost", "verifier.cost")
+    if cost.get("chemprice") is None:
+        return
+    pricing = _block(cost, "chemprice", "verifier.cost.chemprice")
+    _enabled(pricing, "verifier.cost.chemprice", True)
+
+
 def validate_deployment(config):
     """Validate effective destinations for the selected capabilities."""
     errors = []
@@ -97,6 +107,7 @@ def validate_deployment(config):
 
     verifier = config.get("verifier", {})
     if _enabled(verifier, "verifier", True):
+        validate_chemprice(verifier)
         feas = _block(verifier, "feasibility", "verifier.feasibility")
         rater = _block(feas, "rater", "verifier.feasibility.rater")
         value = rater.get("http_url")

@@ -48,6 +48,7 @@ from services.llm_models import (
 )
 
 _CHAT_MESSAGE_ADAPTER = TypeAdapter(ChatMessage)
+from services.llm_http import LLMHTTPSession
 from services.streaming import stream_chat_completion
 from services.anthropic_stream import (
     read_anthropic_stream,
@@ -417,7 +418,7 @@ class LLMClient:
         # transcript logging. Not part of any return value or message stream.
         self.last_reasoning: str | None = None
         self.responses_state = responses_state if responses_state in ("auto", "manual") else "auto"
-        self.session = requests.Session()
+        self.session = LLMHTTPSession()
         _apply_auth(self.session, self.base_url)
         # OpenRouter fallback session, lazily constructed.
         # Activated only when the main Anthropic path raises after both
@@ -530,7 +531,7 @@ class LLMClient:
                 )
                 self._fallback_unavailable_logged = True
             return None
-        sess = requests.Session()
+        sess = LLMHTTPSession()
         sess.headers["Authorization"] = f"Bearer {key}"
         sess.headers.setdefault("anthropic-version", ANTHROPIC_VERSION)
         sess.headers.setdefault("HTTP-Referer", "https://github.com/local/retrosynthesis-agent")
@@ -721,7 +722,7 @@ class LLMClient:
             self.session.close()
         except Exception as exc:
             logger.debug("session.close() failed: %s", exc, exc_info=True)
-        self.session = requests.Session()
+        self.session = LLMHTTPSession()
         _apply_auth(self.session, self.base_url)
 
     def _is_empty_choices_error(self, err: BaseException | None) -> bool:

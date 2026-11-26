@@ -32,7 +32,7 @@ uv run python main.py evaluate jmc --local
 uv run python main.py evaluate hard-mol --local
 ```
 
-For distributed evaluation, supply `--hosts` and configure the deployment on each worker.
+For distributed evaluation, supply `--hosts`. The YAML selected by `--config` or `AGENT_CONFIG` must be readable at the same absolute path on every worker.
 The distributor may probe those hosts even with `--dry-run`. Use `main.py check-config` for offline validation.
 
 ## Where the inputs come from
